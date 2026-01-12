@@ -14,21 +14,64 @@ OVERVIEW
 This script is a small, interactive “craft environment” simulator that runs in a single terminal session. It gives you:
 
 * A channel selector (MCC / RC/V Local / RC/V Remote / SCC / TEST)
-* A craft-shell style prompt (“< ”) with a handful of commands
+* A contextual craft-shell prompt with SEQ counter + status line
 * A simplified RC/V menu (Line/Station, Directory Number, Verify)
 * A stub MCC “page” viewer
 * A minimal SCC mode with a ring-buffer log
-* Lightweight persistence in ./rclog (state.json + journal.log)
+* Lightweight persistence in ./var (dmert.journal + optional state.json)
 
 (Everything below describes the behaviour implemented in 5ESS.pl as currently uploaded.) 
+
+RECENT UPDATES
+
+* 80x24 screen helpers + status line (channel/clerk/mode/time/seq/error).
+* Contextual prompts with SEQ counters and canonical error responses.
+* Stateful alarms with ACK/CLEAR/RAISE and derived alarms.
+* RC/V ticket workflow with staged changes + commit/abort.
+* SCC batch submission + scheduler tick with async notices.
+* DMERT journal persistence in ./var (configurable).
+
+RUNNING
+
+Run the emulator:
+
+  perl 5ESS.pl
+
+Read the manpage:
+
+  man -l man/5ess.1
+
+State lives under ./var by default. Override with:
+
+  export 5ESS_STATE_DIR=/path/to/state
+
+Deterministic SCC scheduling (tests/dev):
+
+  export 5ESS_SEED=1
+
+Resetting state:
+
+  rm -rf ./var
+
+DEV UTILITIES
+
+* /rclog [N]  - show last N journal entries
+* /save       - write a snapshot to var/state.json
+* /reload     - replay journal into memory
+
+SMOKE TEST
+
+Run the canned smoke test:
+
+  tests/smoke.sh
 
 STARTUP FLOW
 
 1. MOTD is printed
-   On launch, it reads and prints etc/motd.dat. 
+   On launch, it reads and prints etc/motd.dat.
 
 2. Persistent state is loaded (or bootstrapped)
-   It loads ./rclog/state.json. If it doesn’t exist (first run), it creates a default state and saves it (“bootstrap”). If the JSON is invalid, it resets to defaults and saves (“reset”). 
+   It replays ./var/dmert.journal into a default state. You can optionally save a snapshot with /save.
 
 3. In-memory structures are populated from the loaded state
    It assigns the loaded hashes/arrays into %lines, %dns, @alarms, %rcaccess, %clerks, @batch_queue, @scc_events. 
@@ -40,23 +83,20 @@ STARTUP FLOW
 
 PERSISTENCE (DMERT-LIKE MINIMUM)
 
-Directory: ./rclog 
+Directory: ./var
 
 Files:
 
-* ./rclog/state.json: pretty-printed JSON snapshot of the emulator’s “database” 
-* ./rclog/journal.log: append-only text log (“<reason> state saved” with timestamps)  
+* ./var/state.json: pretty-printed JSON snapshot of the emulator’s “database”
+* ./var/dmert.journal: append-only JSON event journal
 
 What gets saved:
 
 * lines, dns, alarms, rcaccess, clerks, batch_queue, scc_log 
 
-When state is saved:
+When the journal is appended:
 
-* After SET:RCACCESS (reason “rcaccess <tty>”) 
-* After Line/Station “create line” (reason “line <term>”) 
-* After DN assignment (reason “dn <dn>”) 
-* On first run bootstrap, and on reset due to invalid state.json 
+* After SET:RCACCESS, ALM ACK/CLEAR/RAISE, RCV commits, SCC submits, clerk creation
 
 SESSIONS, CHANNELS, MODES, AND PROMPTS
 
@@ -78,11 +118,10 @@ Session object fields (created fresh each run):
 * permissions_mask (copied from rcaccess{ttyV})
 * created_at 
 
-Prompts are based on session mode:
+Prompts are contextual and include:
 
-* mode == SCC  => “SCC> ”
-* mode == RCV_MENU => “RC/V> ”
-* otherwise => “< ” 
+* CH, CLRK, MODE, DATE/TIME, SEQ (zero-padded)
+* SEQ increments on every command line, including blank lines
 
 Mode transitions:
 
@@ -135,7 +174,7 @@ Global command:
 
 * QUIT: exits the program from any mode. 
 
-Craft shell mode (prompt “< ”)
+Craft shell mode (contextual prompt)
 Accepted commands:
 
 * RCV or RCV:MENU:APPRC
@@ -159,7 +198,7 @@ Anything else:
 
 * Prints “? Unrecognised command – type HELP for options.” 
 
-RC/V menu mode (prompt “RC/V> ”)
+RC/V menu mode (contextual prompt)
 Accepted inputs:
 
 * 1: Line/Station “Line Assignment”
@@ -173,11 +212,13 @@ Accepted inputs:
 * ALM:LIST, OP:CLERK…, OP:RCACCESS…, SET:RCACCESS…
   Those work in RC/V mode too (same behaviour as craft shell). 
 
+Note: RC/V mode requires semicolons on command-form inputs (RCV:OPEN…, ALM:LIST;). Numeric menu selections (1/8/0/Q) do not.
+
 Any other input:
 
 * “? Invalid selection” 
 
-SCC mode (prompt “SCC> ”)
+SCC mode (contextual prompt)
 This mode is selected at login (Channel Select -> “4) SCC”). In SCC mode:
 
 * ALM:LIST prints alarms, then emits some SCC log lines. 
@@ -199,8 +240,8 @@ Example: provision a line and assign a DN
 
 * Start program
 * At channel select, press Enter for default RC/V Local 
-* At “< ” prompt, type: RCV
-* At “RC/V> ” prompt, type: 1
+* At the prompt, type: RCV
+* At RC/V menu, type: 1
   Enter values when prompted (TERMINAL, CABLE-PAIR, etc.) 
 * Then type: 8
   Enter DN, then a terminal you provisioned 
@@ -209,9 +250,9 @@ Example: provision a line and assign a DN
 
 Example: check and set RCACCESS
 
-* From “< ” or “RC/V> ”, run:
+* From the prompt or RC/V menu, run:
   OP:RCACCESS,TTY="ttyV";
   SET:RCACCESS,TTY="ttyV",ACCESS=H'FFFFF';
-  This updates rcaccess and persists it to ./rclog/state.json. 
+  This updates rcaccess and appends a journal entry in ./var/dmert.journal.
 
 If you want, I can also generate a “man-page style” version of this (still plain text, but structured like NAME/SYNOPSIS/DESCRIPTION/COMMANDS/FILES) using the exact same behaviour.

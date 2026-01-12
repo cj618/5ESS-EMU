@@ -1,0 +1,108 @@
+.TH 5ESS 1 "2026-01-01" "5ESS Emulator" "User Commands"
+.SH NAME
+5ess \- 5ESS craft environment miniature emulator
+.SH SYNOPSIS
+.B perl 5ESS.pl
+.SH DESCRIPTION
+The 5ESS emulator is a lightweight, single-terminal craft environment simulation. It provides
+CRAFT, RC/V, and SCC modes with a 5ESS-style prompt, status line, and command set. The UI
+uses ANSI escapes when available, but will run in a dumb terminal with plain output.
+.SH MODES
+.TP
+.B CRAFT
+Default mode with craft-shell commands (ALM, MCC, RC/V workflow, admin utilities).
+.TP
+.B RC/V
+Recent Change/Verify menu mode accessed via RCV:MENU:APPRC or RCV. Menu selections are
+numeric; other commands require a trailing semicolon.
+.TP
+.B SCC
+Batch command mode (SCC:SUBMIT, SCC:STAT, SCC:OUT) with a simple scheduler that emits
+asynchronous job completion lines.
+.SH PROMPT AND STATUS
+The prompt and status line include channel, clerk, mode, timestamp, and SEQ. SEQ increments
+on every command line (including blank lines).
+.SH COMMANDS
+.SS Common
+.TP
+.B QUIT
+Exit the emulator.
+.TP
+.B ALM:LIST;
+Show active alarms (ID, severity, ACK, timestamps).
+.TP
+.B ALM:ACK,<id>;
+Acknowledge an alarm.
+.TP
+.B ALM:CLEAR,<id>;
+Clear an alarm.
+.TP
+.B ALM:RAISE,<sev>,<source>,<text>;
+Raise a new alarm (ADMIN or second-auth required).
+.TP
+.B OP:CLERK;
+Display current clerk and channel.
+.TP
+.B OP:RCACCESS,TTY="<tty>";
+Show RCACCESS mask for a TTY.
+.TP
+.B SET:RCACCESS,TTY="<tty>",ACCESS=H'<mask>';
+Update RCACCESS (ADMIN only).
+.TP
+.B REQ:AUTH,CLRK="<otherclerk>";
+Request second-person authorization (5 minutes or 5 uses).
+.SS RC/V workflow
+.TP
+.B RCV:OPEN,TKT="<id>";
+Open a staged RC/V ticket.
+.TP
+.B RCV:ADD,<key>=<value>;
+Stage changes. Common keys: TERM, PAIR, COS, LINETYPE, CLASS, FEATURES, DN.
+.TP
+.B RCV:CHECK;
+Validate staged changes.
+.TP
+.B RCV:COMMIT;
+Commit staged changes (second-auth required), write journal entry, and apply changes.
+.TP
+.B RCV:ABORT;
+Abort the staged ticket.
+.SS SCC
+.TP
+.B SCC:SUBMIT,JOB="<name>",PARM="<text>";
+Submit a batch job.
+.TP
+.B SCC:STAT;
+Show batch queue counts and recent jobs.
+.TP
+.B SCC:OUT,JOBID=<id>;
+Show job output.
+.SS Utilities
+.TP
+.B /rclog [N]
+Show the last N DMERT journal entries.
+.TP
+.B /save
+Write a JSON snapshot of state.
+.TP
+.B /reload
+Reload state by replaying the journal.
+.SH FILES
+.TP
+.I etc/motd.dat
+Message of the day displayed at login.
+.TP
+.I var/dmert.journal
+Append-only journal file used for persistence.
+.TP
+.I var/state.json
+Optional snapshot file written by /save.
+.SH ENVIRONMENT
+.TP
+.B 5ESS_STATE_DIR
+Override the state directory (default: ./var).
+.TP
+.B 5ESS_SEED
+Seed RNG for deterministic SCC scheduling.
+.SH AUTHOR
+C R Jervis and contributors.
