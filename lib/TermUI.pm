@@ -44,13 +44,13 @@ sub draw_header {
     my $line = sprintf("%-*s", $self->{cols}, $title);
     $line =~ s/\s+$//;
     print "$line\n";
-    print ("-" x $self->{cols}) . "\n";
+    print(("-" x $self->{cols}) . "\n");
 }
 
 sub draw_footer {
     my ($self, $text) = @_;
     $text ||= '';
-    print ("-" x $self->{cols}) . "\n";
+    print(("-" x $self->{cols}) . "\n");
     print "$text\n" if $text ne '';
 }
 
