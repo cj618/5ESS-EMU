@@ -1,0 +1,96 @@
+5ESS(1)                     User Commands                     5ESS(1)
+
+NAME
+     5ESS – minimal AT&T 5ESS craft / RC/V / SCC emulator
+
+SYNOPSIS
+     perl 5ESS.pl
+
+DESCRIPTION
+     5ESS is an interactive terminal-based emulator that simulates a small,
+     operator-facing subset of the AT&T 5ESS Electronic Switching System.
+     It focuses on craft-shell behaviour, RC/V menu workflows, alarms,
+     MCC page display, SCC monitoring stubs, and minimal persistence.
+
+     The emulator is single-user and single-process, but supports multiple
+     logical channels (MCC, RC/V, SCC, TEST) with channel-scoped behaviour.
+     Hardware switching and real call processing are not implemented.
+
+     The system persists state across restarts using a DMERT-like filesystem
+     rooted at ./rclog.
+
+STARTUP
+     On startup, the program:
+
+     1. Prints a Message of the Day from etc/motd.dat
+     2. Loads persistent state from ./rclog/state.json
+        - If missing, initializes default state
+        - If invalid, resets state and saves defaults
+     3. Prompts for channel selection
+     4. Creates a session bound to the chosen channel
+     5. Enters the craft shell or SCC loop
+
+CHANNELS
+     A session is bound to exactly one channel. Channels cannot be changed
+     without restarting the program.
+
+     MCC
+         Master Control Center (stub). Uses craft shell. Supports MCC page
+         commands and OP/ALM queries.
+
+     RC/V Local
+         Local Recent Change and Verify terminal. Default channel.
+         Supports RC/V menu access and provisioning.
+
+     RC/V Remote
+         Remote RC/V terminal. Currently behaves the same as RC/V Local.
+
+     SCC
+         Switching Control Center. Passive monitoring channel. Receives
+         unsolicited event output and blocks RC changes.
+
+     TEST
+         Test channel (stub). Exists for future expansion.
+
+SESSION MODES
+     Within a channel, a session can operate in one of several modes:
+
+     CRAFT
+         Default mode. Prompt is "< ".
+         Accepts craft commands and allows entry into RC/V menu mode.
+
+     RCV_MENU
+         RC/V menu system. Prompt is "RC/V> ".
+         Allows line assignment, DN assignment, and verify.
+
+     SCC
+         SCC monitoring mode. Prompt is "SCC> ".
+         Accepts limited OP queries and prints unsolicited events.
+
+PROMPTS
+     <       Craft shell
+     RC/V>   RC/V menu
+     SCC>    Switching Control Center
+
+FILES
+     ./rclog/
+         DMERT-like persistence directory.
+
+     ./rclog/state.json
+         JSON snapshot of emulator state.
+
+     ./rclog/journal.log
+         Append-only log recording state save events.
+
+     etc/motd.dat
+         Message of the Day displayed at startup.
+
+COMMANDS
+     See in-program HELP for full command listing.
+
+LIMITATIONS
+     This emulator does not implement real call processing, hardware,
+     billing, or OSS integration. It is intended as a behavioural scaffold.
+
+AUTHOR
+     C R Jervis.
