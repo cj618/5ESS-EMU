@@ -41,7 +41,7 @@ my %config = (
     auth_uses              => 5,
 );
 
-srand($ENV{5ESS_SEED}) if defined $ENV{5ESS_SEED};
+srand($ENV{'5ESS_SEED'}) if defined $ENV{'5ESS_SEED'};
 
 my $ui = TermUI->new(title => 'PACIFIC BELL 5ESS CRAFT ENVIRONMENT');
 
@@ -471,6 +471,7 @@ sub handle_op_clerk {
 }
 
 sub handle_mcc_guide {
+    my ($session) = @_;
     print "\n--- MCC PAGE LOCATION GUIDE (STUB) ---\n";
     print "USE MCC:SHOW <PAGE> TO DISPLAY A PAGE.\n";
     print "KNOWN PAGES: 1000, 105, 110\n";
