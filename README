@@ -254,5 +254,3 @@ Example: check and set RCACCESS
   OP:RCACCESS,TTY="ttyV";
   SET:RCACCESS,TTY="ttyV",ACCESS=H'FFFFF';
   This updates rcaccess and appends a journal entry in ./var/dmert.journal.
-
-If you want, I can also generate a “man-page style” version of this (still plain text, but structured like NAME/SYNOPSIS/DESCRIPTION/COMMANDS/FILES) using the exact same behaviour.
