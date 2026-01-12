@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use JSON::PP;
+use Term::ReadKey;
 use File::Path qw(make_path);
 
 # -----------------------------------------------------------------------------
