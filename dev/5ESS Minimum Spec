@@ -1,0 +1,310 @@
+MINIMUM-COMPLETE 5ESS EMULATOR SPEC
+
+GOAL
+Simulate operator-facing behaviour, control flow, and state transitions of a 5ESS sufficiently to support realistic RC/V provisioning, maintenance observation, and troubleshooting workflows. Hardware is abstracted; behaviour is authoritative.
+
+---
+
+1. EXECUTION MODEL
+
+1.1 Channel-scoped terminals (mandatory)
+The emulator MUST implement distinct terminal channels with fixed roles.
+A session is bound to exactly one channel and cannot change channels.
+
+Minimum required channels:
+
+* MCC (Master Control Center)
+* RC/V Local
+* RC/V Remote
+* SCC (Switching Control Center)
+* TEST
+* STLWS (may be stubbed)
+* Maintenance (may be stubbed)
+
+Each channel MUST have:
+
+* Its own prompt style
+* Its own allowed command set
+* Its own unsolicited output behaviour
+* Its own visibility of alarms, logs, and RC traffic
+
+---
+
+2. DMERT OPERATING ENVIRONMENT
+
+2.1 Craft shell
+A DMERT-style craft shell MUST exist.
+
+* Prompt is a simple symbol (e.g. "<")
+* Supports command execution, errors, and return codes
+* Is the entry point for RC/V, test, and OP: commands
+
+2.2 File system abstraction
+The emulator MUST implement a minimal DMERT-like filesystem abstraction:
+
+* /rclog for RC/V output, batch files, history
+* Persistent storage across sessions
+* File creation via RC/V and OP commands
+
+2.3 OS persistence
+State MUST survive restart:
+
+* RC security
+* Clerk IDs
+* Translations
+* Batch RC data
+* Alarm state
+
+---
+
+3. TERMINAL SECURITY & ACCESS CONTROL
+
+3.1 RC/V terminal permissions
+Each terminal MUST have an RC permission bitmask.
+
+* Permissions are terminal-scoped, not user-scoped
+* Permissions are stored outside translation data
+* Verify is always allowed
+
+3.2 RC access management
+The following commands MUST exist and function:
+
+* SET:RCACCESS
+* OP:RCACCESS
+
+3.3 Clerk identity system
+The emulator MUST support:
+
+* CLERK-ID
+* PASSWORD
+* Clerk authentication on RC/V terminals
+* Clerk attribution in logs and batch history
+
+---
+
+4. RC/V SYSTEM (CORE)
+
+4.1 RC/V interaction modes
+The emulator MUST implement all three:
+
+* RC/V Menu mode
+* RC/V Text Interface (APPTEXT)
+* Craft-shell RC commands
+
+Each mode MUST differ in:
+
+* Syntax
+* Error handling
+* Output routing
+* Logging behaviour
+
+4.2 RC/V class hierarchy
+RC/V MUST be organised into:
+
+* Classes
+* Views within classes
+* Screen numbers with semantic meaning
+
+Navigation MUST follow authentic rules:
+
+* Class → View → Screen
+* Backtracking semantics
+* Screen paging
+
+4.3 RC/V view lifecycle
+Each view MUST support:
+
+* Insert
+* Review
+* Update
+* Delete
+* Verify
+
+Key fields MUST be immutable where appropriate.
+
+---
+
+5. TRANSLATION & DATA MODEL
+
+5.1 Line and DN model
+At minimum:
+
+* Lines
+* Directory Numbers
+* Line/DN association
+
+5.2 Feature lifecycle model
+Features MUST follow a three-stage lifecycle:
+
+* Definition (feature presence)
+* Parameterisation (feature data)
+* Activation (feature state)
+
+A feature is not active merely because it is defined.
+
+5.3 Translation integrity
+The emulator MUST support:
+
+* Verify operations
+* Translation dumps
+* Consistency checks (even if simulated)
+
+---
+
+6. BATCH RC SYSTEM
+
+6.1 Batch input modes
+The emulator MUST support:
+
+* BMI (Batch Mode Input)
+* BMD (Batch Mode Display)
+* BMR (Batch Mode Release)
+
+6.2 Deferred execution
+Batch RC MUST support:
+
+* Demand release
+* Time-based release
+
+6.3 Batch persistence
+Batch RC data MUST:
+
+* Be stored in /rclog
+* Survive restart
+* Record clerk, time, status
+
+6.4 Batch reporting
+The emulator MUST provide:
+
+* Clerk activity reports
+* Service order history
+* Pending / complete / error states
+
+---
+
+7. OUTPUT DEVICES & ROUTING
+
+7.1 Receive-Only Printer (ROP)
+The emulator MUST implement a ROP abstraction:
+
+* Cannot accept input
+* Receives summaries, logs, batch output
+* Selectable output target
+
+7.2 Output routing
+RC/V and OP commands MUST be able to route output to:
+
+* Screen
+* ROP
+* File
+* Other TTYs
+
+---
+
+8. ALARMS & EVENTING
+
+8.1 Alarm model
+The emulator MUST support:
+
+* Alarm generation
+* Alarm levels
+* Alarm persistence
+* Alarm listing
+
+8.2 Unsolicited messages
+Some channels (especially SCC and MCC) MUST receive unsolicited output.
+
+---
+
+9. SCC REAL-TIME MONITORING
+
+9.1 Continuous event stream
+The SCC channel MUST receive:
+
+* Configuration changes
+* Call events (simulated)
+* Test activity
+* Alarm echoes
+
+9.2 Logging role
+SCC output is NOT AMA.
+It represents real-time operational monitoring.
+
+---
+
+10. TEST & MAINTENANCE MODEL
+
+10.1 Test channel
+The TEST channel MUST support:
+
+* Line seizure
+* Line monitoring
+* Test command execution
+
+10.2 Test Position (TP) model
+The emulator MUST implement:
+
+* Test Position allocation
+* TP to DN binding
+* TP to line/trunk association
+
+10.3 BLV support
+Busy Line Verification MUST be supported:
+
+* Via explicit commands
+* With stateful behaviour
+* With teardown semantics
+
+---
+
+11. COMMAND LANGUAGE (MML)
+
+11.1 Command grammar
+The emulator MUST support MML-style commands:
+
+* Verb:Target,Parameters;
+* Verb:Target,Parameters!
+* Proper termination rules
+
+11.2 Error semantics
+Errors MUST return authentic codes:
+
+* OK
+* PF
+* NG
+* IP
+* NA
+* RL
+* Field-level errors (?A, ?D, ?E, etc.)
+
+---
+
+12. AUTHENTIC FAILURE MODES
+
+12.1 Denials
+Commands MUST fail realistically due to:
+
+* Permission
+* Channel
+* State
+* Invalid context
+
+12.2 Partial success
+Some commands MUST succeed partially or defer execution.
+
+---
+
+13. NON-GOALS (EXPLICIT)
+
+The emulator does NOT need to:
+
+* Perform real switching
+* Generate real AMA billing records
+* Model physical hardware timing
+* Implement full OSS integration
+
+BUT all referenced behaviours MUST appear real to the operator.
+
+---
+
+END OF SPEC

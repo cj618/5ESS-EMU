@@ -4,12 +4,14 @@ use strict;
 use warnings;
 
 # -----------------------------------------------------------------------------
-# 5ESS Craft‑Shell & RC/V miniature emulator (educational use)
+# 5ESS AT&T craft environment miniature emulator
 # -----------------------------------------------------------------------------
-# C R Jervis – starter template, April 2025
+# Copyright (c) 2025, 2026 C R Jervis under the terms outlined in LICENSE document.
+# Based on documentation that is Copyright (c) 1984 - 1991 AT&T.
 #
-# Emulates a tiny subset of the AT&T 5ESS craft environment so you can get the
-# “feel” of moving between the shell prompt and the Recent‑Change/Verify menu.
+# 5ESS is a registered trademark of Lucent Technologies, Inc.
+#
+#
 # -----------------------------------------------------------------------------
 
 # In‑memory data structures 
