@@ -33,8 +33,8 @@ STARTUP FLOW
 3. In-memory structures are populated from the loaded state
    It assigns the loaded hashes/arrays into %lines, %dns, @alarms, %rcaccess, %clerks, @batch_queue, @scc_events. 
 
-4. Channel is selected, and a session is created
-   You pick a channel from the menu; default is RC/V Local. A session object is created with channel + mode + metadata.  
+4. Channel is selected, clerk login is prompted, and a session is created
+   You pick a channel from the menu; default is RC/V Local. You then enter CLERK ID and PASSWORD. Existing clerks must match the stored password; new clerk creation is only allowed when the channel is TEST. The session object is created with channel + mode + metadata.  
 
 5. It prints the “Craft Shell (sim)” banner and enters the main loop 
 
@@ -73,7 +73,7 @@ Session object fields (created fresh each run):
 * session_id (increments)
 * channel
 * mode: “SCC” if channel==SCC, otherwise “CRAFT”
-* clerk_id (unused right now)
+* clerk_id (set during login)
 * tty_name (defaults to ttyV)
 * permissions_mask (copied from rcaccess{ttyV})
 * created_at 
@@ -121,7 +121,11 @@ There are two gates checked before RC/V “changes” (Line/Station, DN assignme
 * If the session channel is SCC, RC changes are blocked (“NG - CHANNEL RESTRICTED”). 
 * Otherwise allowed. 
 
-2. RCACCESS restriction (only applied for RC/V channels)
+2. Clerk login restriction (only applied for RC/V channels)
+
+* If session channel begins with RCV_ then a clerk must be logged in, otherwise “NG - CLERK LOGIN REQUIRED”.  
+
+3. RCACCESS restriction (only applied for RC/V channels)
 
 * If session channel begins with RCV_ then it checks rcaccess{tty_name}; only mask == FFFFF is allowed. Otherwise “NG - RCACCESS DENIED”.  
 
@@ -144,6 +148,8 @@ Accepted commands:
   Displays a stub page body from %mcc_pages (or “? MCC page not found”).  
 * OP:RCACCESS,TTY="<tty>";
   Prints RCACCESS line if known, else “RL - NO SUCH TTY”.  
+* OP:CLERK;
+  Prints the current clerk ID and channel.  
 * SET:RCACCESS,TTY="<tty>",ACCESS=H'<mask>';
   Updates rcaccess, saves state, enqueues an SCC log event, prints “RCACCESS UPDATED”.  
 * HELP
@@ -164,7 +170,7 @@ Accepted inputs:
   Prints a “Translation Database Dump” listing each terminal record with DN/COS/TYPE/CLASS/FEAT/CABLE. 
 * Q or RCV:MENU:SH!
   Exits RC/V menu back to craft shell. 
-* ALM:LIST, OP:RCACCESS…, SET:RCACCESS…
+* ALM:LIST, OP:CLERK…, OP:RCACCESS…, SET:RCACCESS…
   Those work in RC/V mode too (same behaviour as craft shell). 
 
 Any other input:
