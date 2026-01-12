@@ -245,10 +245,7 @@ sub clerk_login {
         next unless $clerk_id;
 
         print "PASSWORD? ";
-        ReadMode('noecho');
         my $password = <STDIN> // '';
-        ReadMode('restore');
-        print "\n";
         chomp $password;
 
         if (exists $clerks{$clerk_id}) {
