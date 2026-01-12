@@ -12,7 +12,7 @@ sub now_stamp {
 }
 
 sub base_dir {
-    return $ENV{5ESS_STATE_DIR} || $ENV{5ESS_VAR} || './var';
+    return $ENV{'5ESS_STATE_DIR'} || $ENV{'5ESS_VAR'} || './var';
 }
 
 sub journal_path {
