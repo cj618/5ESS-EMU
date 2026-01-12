@@ -1,15 +1,17 @@
 {
-   "dns" : {},
-   "lines" : {},
-   "rcaccess" : {
-      "ttyW" : "FFFFF",
-      "ttyV" : "FFFFF"
-   },
-   "clerks" : {},
-   "batch_queue" : [],
    "scc_log" : [],
    "alarms" : [
       "MINOR  SM02  High-Bit-Error-Rate",
       "MAJOR  PWR   Battery discharge 53.1 V -> 50.9 V"
-   ]
+   ],
+   "batch_queue" : [],
+   "lines" : {},
+   "clerks" : {
+      "admin" : "admin"
+   },
+   "rcaccess" : {
+      "ttyW" : "FFFFF",
+      "ttyV" : "FFFFF"
+   },
+   "dns" : {}
 }
