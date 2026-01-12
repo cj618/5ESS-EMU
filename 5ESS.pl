@@ -482,7 +482,7 @@ sub main_loop {
 # print login motd for simulation purposes
 
 print "\n";
-open my $fh, '<', './etc/motd.dat' or die $!;
+open my $fh, '<', 'etc/motd.dat' or die $!;
 print while <$fh>;
 close $fh;
 

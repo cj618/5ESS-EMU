@@ -1,0 +1,211 @@
+# -----------------------------------------------------------------------------
+# 5ESS AT&T craft environment miniature emulator
+# -----------------------------------------------------------------------------
+# Copyright (c) 2025, 2026 C R Jervis under the terms outlined in LICENSE document.
+# Based on documentation that is Copyright (c) 1984 - 1991 AT&T.
+#
+# 5ESS is a registered trademark of Lucent Technologies, Inc.
+#
+# -----------------------------------------------------------------------------
+
+
+OVERVIEW
+
+This script is a small, interactive “craft environment” simulator that runs in a single terminal session. It gives you:
+
+* A channel selector (MCC / RC/V Local / RC/V Remote / SCC / TEST)
+* A craft-shell style prompt (“< ”) with a handful of commands
+* A simplified RC/V menu (Line/Station, Directory Number, Verify)
+* A stub MCC “page” viewer
+* A minimal SCC mode with a ring-buffer log
+* Lightweight persistence in ./rclog (state.json + journal.log)
+
+(Everything below describes the behaviour implemented in 5ESS.pl as currently uploaded.) 
+
+STARTUP FLOW
+
+1. MOTD is printed
+   On launch, it reads and prints etc/motd.dat. 
+
+2. Persistent state is loaded (or bootstrapped)
+   It loads ./rclog/state.json. If it doesn’t exist (first run), it creates a default state and saves it (“bootstrap”). If the JSON is invalid, it resets to defaults and saves (“reset”). 
+
+3. In-memory structures are populated from the loaded state
+   It assigns the loaded hashes/arrays into %lines, %dns, @alarms, %rcaccess, %clerks, @batch_queue, @scc_events. 
+
+4. Channel is selected, and a session is created
+   You pick a channel from the menu; default is RC/V Local. A session object is created with channel + mode + metadata.  
+
+5. It prints the “Craft Shell (sim)” banner and enters the main loop 
+
+PERSISTENCE (DMERT-LIKE MINIMUM)
+
+Directory: ./rclog 
+
+Files:
+
+* ./rclog/state.json: pretty-printed JSON snapshot of the emulator’s “database” 
+* ./rclog/journal.log: append-only text log (“<reason> state saved” with timestamps)  
+
+What gets saved:
+
+* lines, dns, alarms, rcaccess, clerks, batch_queue, scc_log 
+
+When state is saved:
+
+* After SET:RCACCESS (reason “rcaccess <tty>”) 
+* After Line/Station “create line” (reason “line <term>”) 
+* After DN assignment (reason “dn <dn>”) 
+* On first run bootstrap, and on reset due to invalid state.json 
+
+SESSIONS, CHANNELS, MODES, AND PROMPTS
+
+Channel selection values:
+
+* MCC
+* RCV_LOCAL
+* RCV_REMOTE
+* SCC
+* TEST 
+
+Session object fields (created fresh each run):
+
+* session_id (increments)
+* channel
+* mode: “SCC” if channel==SCC, otherwise “CRAFT”
+* clerk_id (unused right now)
+* tty_name (defaults to ttyV)
+* permissions_mask (copied from rcaccess{ttyV})
+* created_at 
+
+Prompts are based on session mode:
+
+* mode == SCC  => “SCC> ”
+* mode == RCV_MENU => “RC/V> ”
+* otherwise => “< ” 
+
+Mode transitions:
+
+* From craft shell to RC/V menu: enter “RCV” or “RCV:MENU:APPRC”
+  This sets session->{mode} = “RCV_MENU”. 
+* From RC/V menu back to craft shell: enter “Q” or “RCV:MENU:SH!”
+  This sets session->{mode} = “CRAFT”. 
+
+CORE DATA MODEL
+
+Lines (provisioned by terminal number):
+
+* %lines keyed by terminal string
+* Each record stores: pair, cos, dn, linetype, class, features  
+
+DN map:
+
+* %dns keyed by directory number => terminal  
+
+Alarms:
+
+* @alarms array of strings 
+* Defaults include two seeded alarms (SM02 minor, PWR major) 
+
+RCACCESS:
+
+* %rcaccess maps tty name to a 5-hex-digit mask string
+* Default state seeds ttyV and ttyW to FFFFF 
+
+ACCESS CONTROL RULES (MINIMAL)
+
+There are two gates checked before RC/V “changes” (Line/Station, DN assignment):
+
+1. Channel restriction
+
+* If the session channel is SCC, RC changes are blocked (“NG - CHANNEL RESTRICTED”). 
+* Otherwise allowed. 
+
+2. RCACCESS restriction (only applied for RC/V channels)
+
+* If session channel begins with RCV_ then it checks rcaccess{tty_name}; only mask == FFFFF is allowed. Otherwise “NG - RCACCESS DENIED”.  
+
+COMMANDS BY CONTEXT
+
+Global command:
+
+* QUIT: exits the program from any mode. 
+
+Craft shell mode (prompt “< ”)
+Accepted commands:
+
+* RCV or RCV:MENU:APPRC
+  Enters the RC/V menu (prints the menu header and options). 
+* ALM:LIST
+  Prints “Outstanding Alarms” and the contents of @alarms.  
+* MCC:GUIDE
+  Prints a stub “MCC Page Location Guide” and lists known page keys.  
+* MCC:SHOW <page>
+  Displays a stub page body from %mcc_pages (or “? MCC page not found”).  
+* OP:RCACCESS,TTY="<tty>";
+  Prints RCACCESS line if known, else “RL - NO SUCH TTY”.  
+* SET:RCACCESS,TTY="<tty>",ACCESS=H'<mask>';
+  Updates rcaccess, saves state, enqueues an SCC log event, prints “RCACCESS UPDATED”.  
+* HELP
+  Prints the craft-shell command list. 
+
+Anything else:
+
+* Prints “? Unrecognised command – type HELP for options.” 
+
+RC/V menu mode (prompt “RC/V> ”)
+Accepted inputs:
+
+* 1: Line/Station “Line Assignment”
+  Prompts for terminal, cable-pair, class of service, line type, line class, features; creates/overwrites a %lines record; saves state; emits SCC log event; prints completion. 
+* 8: Directory Number assignment
+  Prompts for DN and terminal; requires terminal to exist; assigns dn to line and adds to %dns; saves state; emits SCC log event; prints completion. 
+* 0: Verify
+  Prints a “Translation Database Dump” listing each terminal record with DN/COS/TYPE/CLASS/FEAT/CABLE. 
+* Q or RCV:MENU:SH!
+  Exits RC/V menu back to craft shell. 
+* ALM:LIST, OP:RCACCESS…, SET:RCACCESS…
+  Those work in RC/V mode too (same behaviour as craft shell). 
+
+Any other input:
+
+* “? Invalid selection” 
+
+SCC mode (prompt “SCC> ”)
+This mode is selected at login (Channel Select -> “4) SCC”). In SCC mode:
+
+* ALM:LIST prints alarms, then emits some SCC log lines. 
+* Any command starting with OP: prints “(stub) SCC OP response”, then emits some SCC log lines. 
+* Everything else prints “(stub) SCC command ignored”, then emits some SCC log lines. 
+
+SCC log emission model:
+
+* scc_enqueue(text) stores a timestamped line into @scc_events and keeps only the most recent 60. 
+* scc_emit_lines prints 0–3 lines per command (random), shifting them off the queue as it prints. 
+
+MCC PAGES (STUB)
+
+The emulator has a small in-memory page table %mcc_pages with an index page (1000) and a couple of sample pages (105, 110). MCC:GUIDE lists available keys; MCC:SHOW prints the title and body lines.  
+
+QUICK “HOW TO USE” EXAMPLES
+
+Example: provision a line and assign a DN
+
+* Start program
+* At channel select, press Enter for default RC/V Local 
+* At “< ” prompt, type: RCV
+* At “RC/V> ” prompt, type: 1
+  Enter values when prompted (TERMINAL, CABLE-PAIR, etc.) 
+* Then type: 8
+  Enter DN, then a terminal you provisioned 
+* Then type: 0
+  You’ll see the translation dump 
+
+Example: check and set RCACCESS
+
+* From “< ” or “RC/V> ”, run:
+  OP:RCACCESS,TTY="ttyV";
+  SET:RCACCESS,TTY="ttyV",ACCESS=H'FFFFF';
+  This updates rcaccess and persists it to ./rclog/state.json. 
+
+If you want, I can also generate a “man-page style” version of this (still plain text, but structured like NAME/SYNOPSIS/DESCRIPTION/COMMANDS/FILES) using the exact same behaviour.
