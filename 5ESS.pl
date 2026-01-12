@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+
 use strict;
 use warnings;
 
@@ -6,11 +7,12 @@ use warnings;
 # 5ESS Craft‑Shell & RC/V miniature emulator (educational use)
 # -----------------------------------------------------------------------------
 # C R Jervis – starter template, April 2025
+#
 # Emulates a tiny subset of the AT&T 5ESS craft environment so you can get the
 # “feel” of moving between the shell prompt and the Recent‑Change/Verify menu.
 # -----------------------------------------------------------------------------
 
-# In‑memory data structures ----------------------------------------------------
+# In‑memory data structures 
 my %lines;         # key = terminal number, value = hashref of line data
 my %dns;           # key = directory number, value = terminal number
 my @alarms;        # array of outstanding alarm strings
@@ -18,6 +20,62 @@ my @alarms;        # array of outstanding alarm strings
 # Seed some demo alarms
 push @alarms, 'MINOR  SM02  High‑Bit‑Error‑Rate';
 push @alarms, 'MAJOR  PWR   Battery discharge 53.1 V → 50.9 V';
+
+# MCC pages (minimal stub index + sample pages) 
+my %mcc_pages = (
+    '1000' => {
+        title => 'MCC Page Index',
+        body  => [
+            '105  System Status Summary',
+            '110  Switch Environment',
+            '115  CM2 Status',
+            '116  CM2 Alarms',
+            '123  Network Overview',
+            '125  Trunk Summary',
+            '1800X Processor Status',
+            '1850  Recent-Change Activity',
+            '1851  Verification Summary',
+        ],
+    },
+    '105' => {
+        title => 'System Status Summary',
+        body  => [
+            'SM02  OK',
+            'SM03  OK',
+            'PWR   MINOR (Battery discharge 50.9 V)',
+            'ALM   MAJOR (High-Bit-Error-Rate)',
+        ],
+    },
+    '110' => {
+        title => 'Switch Environment',
+        body  => [
+            'TEMP  72F',
+            'HUM   45%',
+            'PWR   53.1V',
+            'FANS  OK',
+        ],
+    },
+);
+
+sub mcc_location_guide {
+    print "\n--- MCC Page Location Guide (stub) ---\n";
+    print "Use MCC:SHOW <page> to display a page.\n";
+    print "Known pages: " . join(', ', sort keys %mcc_pages) . "\n";
+}
+
+sub mcc_show_page {
+    my ($page) = @_;
+    $page ||= '';
+    $page =~ s/^\s+|\s+$//g;
+    unless ($page && exists $mcc_pages{$page}) {
+        print "? MCC page not found. Use MCC:GUIDE for list.\n";
+        return;
+    }
+    my $entry = $mcc_pages{$page};
+    print "\n--- MCC PAGE $page: $entry->{title} ---\n";
+    print "$_\n" for @{ $entry->{body} };
+}
+
 
 # Helper subs ------------------------------------------------------------------
 sub prompt {
@@ -41,8 +99,17 @@ sub shell {
             print "$_\n" for @alarms;
             next;
         }
+            if ($cmd =~ /^MCC:GUIDE:?$/i) {
+            mcc_location_guide();
+            next;
+        }
+        if ($cmd =~ /^MCC:SHOW\s+(\S+)$/i) {
+            mcc_show_page($1);
+            next;
+        }
+
         if ($cmd =~ /^HELP$/i) {
-            print "\nAvailable commands: RCV   ALM:LIST   HELP   QUIT\n";
+            print "\nAvailable commands: RCV   ALM:LIST   MCC:GUIDE   MCC:SHOW <page>   HELP   QUIT\n";
             next;
         }
         if ($cmd =~ /^QUIT$/i) {
@@ -125,7 +192,14 @@ sub verify_menu {
     }
 }
 
-# -----------------------------------------------------------------------------
+# print login motd for simulation purposes
+
+print "\n";
+open my $fh, '<', './etc/motd.dat' or die $!;
+print while <$fh>;
+
+# now drop the user into the shell
+
 print "\n* * *  5ESS Craft Shell (sim)  * * *\nType HELP for command list.\n\n";
 
 shell();
