@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use JSON::PP;
+use Term::ReadKey;
 use File::Path qw(make_path);
 
 # -----------------------------------------------------------------------------
@@ -192,6 +193,12 @@ sub rcaccess_allows_changes {
     return uc($mask) eq 'FFFFF';
 }
 
+sub clerk_allows_changes {
+    my ($session) = @_;
+    return 1 unless $session->{channel} =~ /^RCV_/;
+    return defined $session->{clerk_id} && $session->{clerk_id} ne '';
+}
+
 sub channel_allows_rc_changes {
     my ($session) = @_;
     return 0 if $session->{channel} eq 'SCC';
@@ -215,17 +222,53 @@ sub session_prompt {
 }
 
 sub session_create {
-    my ($channel) = @_;
+    my ($channel, $clerk_id) = @_;
     $session_seq++;
     return {
         session_id       => $session_seq,
         channel          => $channel,
         mode             => ($channel eq 'SCC') ? 'SCC' : 'CRAFT',
-        clerk_id         => undef,
+        clerk_id         => $clerk_id,
         tty_name         => 'ttyV',
         permissions_mask => $rcaccess{'ttyV'} // 'FFFFF',
         created_at       => now_stamp(),
     };
+}
+
+sub clerk_login {
+    my ($channel) = @_;
+    while (1) {
+        print "CLERK ID? ";
+        my $clerk_id = <STDIN> // '';
+        chomp $clerk_id;
+        $clerk_id =~ s/^\s+|\s+$//g;
+        next unless $clerk_id;
+
+        print "PASSWORD? ";
+        ReadMode('noecho');
+        my $password = <STDIN> // '';
+        ReadMode('restore');
+        print "\n";
+        chomp $password;
+
+        if (exists $clerks{$clerk_id}) {
+            if ($clerks{$clerk_id} eq $password) {
+                return $clerk_id;
+            }
+            print "NG - INVALID PASSWORD\n";
+            next;
+        }
+
+        if ($channel eq 'TEST') {
+            $clerks{$clerk_id} = $password;
+            my $state = dmert_snapshot_state();
+            dmert_save_state($state, "clerk $clerk_id");
+            print "NEW CLERK CREATED\n";
+            return $clerk_id;
+        }
+
+        print "NG - CLERK NOT AUTHORIZED\n";
+    }
 }
 
 sub select_channel {
@@ -272,6 +315,12 @@ sub handle_set_rcaccess {
     print "RCACCESS UPDATED\n";
 }
 
+sub handle_op_clerk {
+    my ($session) = @_;
+    my $clerk = $session->{clerk_id} // 'NONE';
+    print "CLERK ID=\"$clerk\" CHANNEL=$session->{channel}\n";
+}
+
 sub dispatch_craft_command {
     my ($session, $cmd) = @_;
     if ($cmd =~ /^RCV:MENU:APPRC\b/i || $cmd =~ /^RCV\b/i) {
@@ -297,12 +346,16 @@ sub dispatch_craft_command {
         handle_op_rcaccess($1);
         return 1;
     }
+    if ($cmd =~ /^OP:CLERK\s*;?$/i) {
+        handle_op_clerk($session);
+        return 1;
+    }
     if ($cmd =~ /^SET:RCACCESS,TTY="([^"]+)",ACCESS=H'([0-9A-Fa-f]{5})'\s*;?$/i) {
         handle_set_rcaccess($1, $2);
         return 1;
     }
     if ($cmd =~ /^HELP$/i) {
-        print "\nAvailable commands: RCV:MENU:APPRC   ALM:LIST   MCC:GUIDE   MCC:SHOW <page>   OP:RCACCESS   SET:RCACCESS   HELP   QUIT\n";
+        print "\nAvailable commands: RCV:MENU:APPRC   ALM:LIST   MCC:GUIDE   MCC:SHOW <page>   OP:CLERK   OP:RCACCESS   SET:RCACCESS   HELP   QUIT\n";
         return 1;
     }
     print "? Unrecognised command – type HELP for options.\n";
@@ -312,6 +365,7 @@ sub dispatch_craft_command {
 sub line_station_menu {
     my ($session) = @_;
     return unless allow_or_deny(channel_allows_rc_changes($session), 'CHANNEL RESTRICTED');
+    return unless allow_or_deny(clerk_allows_changes($session), 'CLERK LOGIN REQUIRED');
     return unless allow_or_deny(rcaccess_allows_changes($session), 'RCACCESS DENIED');
 
     print "\n[1.11] Line Assignment – Terminal #, Cable-Pair, COS, Type, Class, Features\n";
@@ -353,6 +407,7 @@ sub line_station_menu {
 sub directory_number_menu {
     my ($session) = @_;
     return unless allow_or_deny(channel_allows_rc_changes($session), 'CHANNEL RESTRICTED');
+    return unless allow_or_deny(clerk_allows_changes($session), 'CLERK LOGIN REQUIRED');
     return unless allow_or_deny(rcaccess_allows_changes($session), 'RCACCESS DENIED');
 
     print "\n[8.12] Assign Directory Number – enter DN & Terminal #\n";
@@ -419,6 +474,10 @@ sub dispatch_rcv_menu {
     }
     if ($cmd =~ /^OP:RCACCESS,TTY="([^"]+)"\s*;?$/i) {
         handle_op_rcaccess($1);
+        return 1;
+    }
+    if ($cmd =~ /^OP:CLERK\s*;?$/i) {
+        handle_op_clerk($session);
         return 1;
     }
     if ($cmd =~ /^SET:RCACCESS,TTY="([^"]+)",ACCESS=H'([0-9A-Fa-f]{5})'\s*;?$/i) {
@@ -496,7 +555,8 @@ my $state = dmert_load_state();
 @scc_events = @{ $state->{scc_log} // [] };
 
 my $channel = select_channel();
-my $session = session_create($channel);
+my $clerk_id = clerk_login($channel);
+my $session = session_create($channel, $clerk_id);
 
 print "\n* * *  5ESS Craft Shell (sim)  * * *\nType HELP for command list.\n\n";
 
