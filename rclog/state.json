@@ -4,14 +4,15 @@
       "MINOR  SM02  High-Bit-Error-Rate",
       "MAJOR  PWR   Battery discharge 53.1 V -> 50.9 V"
    ],
-   "batch_queue" : [],
-   "lines" : {},
-   "clerks" : {
-      "admin" : "admin"
-   },
    "rcaccess" : {
       "ttyW" : "FFFFF",
       "ttyV" : "FFFFF"
    },
-   "dns" : {}
+   "dns" : {},
+   "clerks" : {
+      "admin" : "admin",
+      "test" : "test"
+   },
+   "batch_queue" : [],
+   "lines" : {}
 }
