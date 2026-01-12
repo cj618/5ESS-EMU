@@ -146,7 +146,8 @@ sub rcv_menu {
 }
 
 sub line_station_menu {
-    print "\n[1.11] Line Assignment – enter Terminal #, Cable‑Pair, Class of Service\n";
+    print "\n[1.11] Line Assignment – Terminal #, Cable-Pair, COS, Type, Class, Features\n";
+
     print "TERMINAL? ";
     my $term = <STDIN>; chomp $term; $term =~ s/^\s+|\s+$//g;
     return unless $term;
@@ -157,7 +158,25 @@ sub line_station_menu {
     print "CLASS OF SERVICE (e.g. POTS, ISDN)? ";
     my $cos = <STDIN>; chomp $cos; $cos =~ s/^\s+|\s+$//g;
 
-    $lines{$term} = { pair => $pair, cos => $cos, dn => undef };
+    print "LINE TYPE (e.g. 1FR, 1TR, ISDN)? ";
+    my $linetype = <STDIN>; chomp $linetype; $linetype =~ s/^\s+|\s+$//g;
+
+    print "LINE CLASS (e.g. RES, BUS)? ";
+    my $lineclass = <STDIN>; chomp $lineclass; $lineclass =~ s/^\s+|\s+$//g;
+
+    print "FEATURES (comma-separated, e.g. CALLWAIT, 3WAY)? ";
+    my $features = <STDIN>; chomp $features; $features =~ s/^\s+|\s+$//g;
+
+
+    $lines{$term} = {
+        pair     => $pair,
+        cos      => $cos,
+        dn       => undef,
+        linetype => $linetype,
+        class    => $lineclass,
+        features => $features,
+    };    
+    
     print "\nRECENT CHANGE COMPLETED – terminal $term ready.\n";
 }
 
@@ -184,11 +203,15 @@ sub verify_menu {
     print "\n--- Translation Database Dump ---\n";
     for my $term (sort keys %lines) {
         my $rec = $lines{$term};
-        printf "TERM %-6s DN %-10s COS %-8s CABLE %s\n",
+         printf "TERM %-6s DN %-10s COS %-8s TYPE %-6s CLASS %-5s FEAT [%s] CABLE %s\n",
             $term,
-            ($rec->{dn} // '‑‑‑‑‑‑‑‑‑'),
-            $rec->{cos},
-            $rec->{pair};
+            ($rec->{dn} // '---------'),
+            ($rec->{cos} // ''),
+            ($rec->{linetype} // ''),
+            ($rec->{class} // ''),
+            ($rec->{features} // ''),
+            ($rec->{pair} // '');
+
     }
 }
 
