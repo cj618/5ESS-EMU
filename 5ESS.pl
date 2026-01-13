@@ -5,6 +5,7 @@ use warnings;
 use FindBin;
 use lib "$FindBin::Bin/lib";
 use Digest::SHA qw(sha256_hex);
+use JSON::PP;
 use Term::ReadKey;
 use Time::HiRes qw(time);
 
@@ -13,6 +14,7 @@ use TermUI;
 use Alarms;
 use RCV;
 use SCC;
+use ROP;
 
 # -----------------------------------------------------------------------------
 # 5ESS(R) AT&T craft environment miniature simulator
@@ -43,12 +45,102 @@ my %config = (
     auth_uses              => 5,
 );
 
+my %sim_config = (
+    feature_flags => {
+        FEATURE_POKES       => 1,
+        FEATURE_ROP         => 1,
+        FEATURE_RCV_VIEWS   => 0,
+        FEATURE_RCV_BATCH   => 0,
+        FEATURE_SCC_STREAM  => 1,
+        FEATURE_REAPPLY_RC  => 0,
+    },
+    theme => {
+        brand       => 'Pacific Bell',
+        office_id   => 'CO',
+        switch_name => '5ESS',
+    },
+    scc => {
+        verbosity => 'normal',
+    },
+    pokes => {
+        '196' => 'RCV',
+    },
+    rop => {
+        file => 'rop.log',
+    },
+    rclog => {
+        dir => 'rclog',
+    },
+    fixed_time_for_tests => '',
+    terminal_map => {
+        MCC       => 'ttyV',
+        RCV_LOCAL => 'ttyV',
+        RCV_REMOTE => 'ttyW',
+        SCC       => 'ttyS',
+        TEST      => 'ttyT',
+    },
+);
+
+sub merge_hashes {
+    my ($base, $override) = @_;
+    return $base unless $override && ref $override eq 'HASH';
+    for my $key (keys %{$override}) {
+        if (ref $override->{$key} eq 'HASH' && ref ($base->{$key} || {}) eq 'HASH') {
+            $base->{$key} = merge_hashes({ %{ $base->{$key} } }, $override->{$key});
+        } else {
+            $base->{$key} = $override->{$key};
+        }
+    }
+    return $base;
+}
+
+sub load_sim_config {
+    my $path = 'etc/sim.json';
+    return unless -e $path;
+    open my $fh, '<', $path or return;
+    local $/;
+    my $json = <$fh>;
+    close $fh;
+    my $data = eval { JSON::PP->new->utf8->decode($json) };
+    return unless $data && ref $data eq 'HASH';
+    merge_hashes(\%sim_config, $data);
+}
+
+load_sim_config();
+if ($sim_config{fixed_time_for_tests}) {
+    $ENV{'FIXED_TIME_FOR_TESTS'} = $sim_config{fixed_time_for_tests};
+}
+
 srand($ENV{'5ESS_SEED'}) if defined $ENV{'5ESS_SEED'};
 
-my $ui = TermUI->new(title => 'PACIFIC BELL 5ESS CRAFT ENVIRONMENT');
+my $brand_name = $sim_config{theme}{brand} // '';
+my $ui_title = ($brand_name eq 'Pacific Bell')
+    ? 'PACIFIC BELL 5ESS CRAFT ENVIRONMENT'
+    : 'AT&T/LUCENT 5ESS CRAFT ENVIRONMENT';
+my $ui = TermUI->new(title => $ui_title);
+my $rop;
+if ($sim_config{feature_flags}{FEATURE_ROP}) {
+    my $rop_path = Persist::base_dir() . '/' . $sim_config{rop}{file};
+    my $rop_brand = ($brand_name eq 'Pacific Bell') ? 'PACIFIC BELL' : 'AT&T/Lucent 5ESS';
+    $rop = ROP->new(
+        state_dir   => Persist::base_dir(),
+        path        => $rop_path,
+        brand       => $rop_brand,
+        office_id   => $sim_config{theme}{office_id},
+        switch_name => $sim_config{theme}{switch_name},
+    );
+}
 
 sub now_stamp {
     return Persist::now_stamp();
+}
+
+sub now_date_time {
+    my $stamp = now_stamp();
+    if ($stamp =~ /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})$/) {
+        return ($1, $2);
+    }
+    return ($stamp, '');
 }
 
 sub password_hash {
@@ -307,13 +399,18 @@ sub session_prompt {
 
 sub session_create {
     my ($channel, $clerk_id, $role) = @_;
+    my $tty = $sim_config{terminal_map}{$channel} // 'ttyV';
     return {
         channel          => $channel,
         mode             => ($channel eq 'SCC') ? 'SCC' : 'CRAFT',
         clerk_id         => $clerk_id,
         role             => $role,
-        tty_name         => 'ttyV',
-        permissions_mask => $state->{rcaccess}{'ttyV'} // 'FFFFF',
+        terminal_type    => $channel,
+        tty_name         => $tty,
+        terminal_name    => $tty,
+        office_id        => $sim_config{theme}{office_id},
+        switch_name      => $sim_config{theme}{switch_name},
+        permissions_mask => $state->{rcaccess}{$tty} // 'FFFFF',
         created_at       => now_stamp(),
         seq              => 0,
         last_error       => { code => 'OK', msg => '' },
@@ -324,12 +421,17 @@ sub session_create {
 sub print_banner {
     $ui->screen_clear();
     $ui->draw_header();
-    print "UNAUTHORIZED USE PROHIBITED\n";
-    print "ALL ACTIVITY MAY BE MONITORED AND RECORDED\n\n";
     if (-e 'etc/motd.dat') {
-        open my $fh, '<', 'etc/motd.dat';
-        print while <$fh>;
-        close $fh;
+        my ($date, $time) = now_date_time();
+        my $motd = $ui->render_template('etc/motd.dat', {
+            BRAND       => $sim_config{theme}{brand},
+            OFFICE_ID   => $sim_config{theme}{office_id},
+            SWITCH_NAME => $sim_config{theme}{switch_name},
+            TTY         => $sim_config{terminal_map}{RCV_LOCAL} // 'ttyV',
+            DATE        => $date,
+            TIME        => $time,
+        });
+        print $motd;
     }
     $ui->draw_footer('ENTER CLERK ID TO CONTINUE');
 }
@@ -498,6 +600,12 @@ sub handle_set_rcaccess {
         mask => uc $mask,
     });
     $scc->log_event("SCC RCACCESS UPDATE TTY=$tty ACCESS=H'$mask'");
+    if ($rop) {
+        $rop->log('SECURITY', 'INFO', "SET RCACCESS TTY=$tty ACCESS=H'$mask'", {
+            clerk   => $session->{clerk_id} // 'NONE',
+            channel => $session->{channel},
+        });
+    }
     result_ok($session, 'RCACCESS UPDATED');
 }
 
@@ -647,6 +755,13 @@ sub handle_line_station_menu {
         line => $state->{lines}{$term},
     });
     $scc->log_event("SCC LINE CREATED TERM=$term");
+    if ($rop) {
+        $rop->log('RCV', 'INFO', "IM LINE ASSIGNMENT TERM=$term", {
+            clerk   => $session->{clerk_id} // 'NONE',
+            channel => $session->{channel},
+            tty     => $session->{tty_name},
+        });
+    }
     result_ok($session, "LINE $term CREATED");
 }
 
@@ -677,6 +792,13 @@ sub handle_directory_number_menu {
         term => $term,
     });
     $scc->log_event("SCC DN ASSIGNED DN=$dn TERM=$term");
+    if ($rop) {
+        $rop->log('RCV', 'INFO', "IM DN ASSIGN DN=$dn TERM=$term", {
+            clerk   => $session->{clerk_id} // 'NONE',
+            channel => $session->{channel},
+            tty     => $session->{tty_name},
+        });
+    }
     result_ok($session, "DN $dn ASSIGNED");
 }
 
@@ -783,6 +905,13 @@ sub handle_rcv_commit {
                 applied => $payload,
             });
             $scc->log_event("RCV COMMIT TKT=$ticket_id TERM=$payload->{term}");
+            if ($rop) {
+                $rop->log('RCV', 'INFO', "RCV COMMIT TKT=$ticket_id TERM=$payload->{term}", {
+                    clerk   => $session->{clerk_id} // 'NONE',
+                    channel => $session->{channel},
+                    tty     => $session->{tty_name},
+                });
+            }
             consume_second_auth($session);
             result_ok($session, "RCV COMMIT $ticket_id");
         } else {
@@ -905,6 +1034,15 @@ sub dispatch_craft_command {
         handle_mcc_show($session, $1);
         return;
     }
+    if ($cmd =~ /^SHOW:ROP(?:,LINES=(\d+))?;?$/i) {
+        return result_ng($session, 'ROP DISABLED') unless $rop;
+        my $count = $1 || 20;
+        my $lines = $rop->tail($count);
+        my $output = "--- ROP OUTPUT (LAST $count) ---\n" . join('', @{$lines});
+        $ui->pager($output);
+        result_ok($session, 'ROP DISPLAYED');
+        return;
+    }
     if ($cmd =~ /^OP:RCACCESS,TTY="([^"]+)"\s*;?$/i) {
         handle_op_rcaccess($session, $1);
         return;
@@ -962,7 +1100,7 @@ sub dispatch_craft_command {
     if ($cmd =~ /^HELP$/i) {
         print "\nAVAILABLE COMMANDS: RCV:MENU:APPRC  ALM:LIST  ALM:ACK  ALM:CLEAR  ALM:RAISE\n";
         print "MCC:GUIDE  MCC:SHOW  OP:CLERK  OP:RCACCESS  SET:RCACCESS  REQ:AUTH\n";
-        print "RCV:OPEN/ADD/CHECK/COMMIT/ABORT  /rclog /save /reload  QUIT\n";
+        print "RCV:OPEN/ADD/CHECK/COMMIT/ABORT  SHOW:ROP  /rclog /save /reload  QUIT\n";
         result_ok($session, 'HELP');
         return;
     }
@@ -1086,6 +1224,21 @@ sub main_loop {
             $ui->draw_status_line(status_text($session));
         }
         if (!$prompted) {
+            if ($sim_config{feature_flags}{FEATURE_RCV_VIEWS}) {
+                my $seq = sprintf('%05d', $session->{seq} || 0);
+                my $header = sprintf(
+                    "%s %s %s  CH=%s TTY=%s CLRK=%s  %s %s  SEQ=%s",
+                    ($brand_name eq 'Pacific Bell') ? 'PACIFIC BELL' : 'AT&T/LUCENT',
+                    $session->{office_id},
+                    $session->{switch_name},
+                    $session->{channel},
+                    $session->{tty_name},
+                    ($session->{clerk_id} // 'NONE'),
+                    now_date_time(),
+                    $seq,
+                );
+                print "$header\n";
+            }
             print session_prompt($session);
             $prompted = 1;
         }
@@ -1117,6 +1270,32 @@ sub main_loop {
         }
 
         if ($session->{mode} eq 'CRAFT') {
+            if ($cmd =~ /^\d+$/ && $sim_config{feature_flags}{FEATURE_POKES}) {
+                my $poke = $cmd;
+                my $action = $sim_config{pokes}{$poke};
+                if ($action && $action eq 'RCV') {
+                    if (!channel_allows_rc_changes($session)
+                        || !clerk_allows_changes($session)
+                        || !rcaccess_allows_changes($session)) {
+                        print "RESULT: NG - RC SECURITY DENIED\n";
+                        if ($rop) {
+                            $rop->log('RCV', 'WARN', "RC/V POKE $poke DENIED", {
+                                clerk   => $session->{clerk_id} // 'NONE',
+                                channel => $session->{channel},
+                                tty     => $session->{tty_name},
+                            });
+                        }
+                        next;
+                    }
+                    $rop->log('RCV', 'INFO', "RC/V POKE $poke STARTING") if $rop;
+                    $session->{mode} = 'RCV_MENU';
+                    print "\n--- 5ESS RECENT-CHANGE/VERIFY ---\n";
+                    print " 1 LINE/STATION  8 DIRECTORY-NUMBER  0 VERIFY  Q QUIT\n";
+                    result_ok($session, 'MODE RCV');
+                    $rop->log('RCV', 'INFO', "RC/V POKE $poke COMPLETED") if $rop;
+                    next;
+                }
+            }
             dispatch_craft_command($session, $cmd);
         } elsif ($session->{mode} eq 'RCV_MENU') {
             dispatch_rcv_menu($session, $cmd);

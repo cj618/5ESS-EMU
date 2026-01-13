@@ -79,6 +79,11 @@ Show batch queue counts and recent jobs.
 Show job output.
 .SS Utilities
 .TP
+.B SHOW:ROP;
+Show the last 20 Records Output Printer lines (ROP). Use
+.BR SHOW:ROP,LINES=50;
+to change the count.
+.TP
 .B /rclog [N]
 Show the last N DMERT journal entries.
 .TP
@@ -89,8 +94,14 @@ Write a JSON snapshot of state.
 Reload state by replaying the journal.
 .SH FILES
 .TP
+.I etc/sim.json
+Configuration file for feature flags, theme, pokes, and ROP output.
+.TP
 .I etc/motd.dat
 Message of the day displayed at login.
+.TP
+.I var/rop.log
+Records Output Printer stream (when enabled).
 .TP
 .I var/dmert.journal
 Append-only journal file used for persistence.
@@ -104,5 +115,8 @@ Override the state directory (default: ./var).
 .TP
 .B 5ESS_SEED
 Seed RNG for deterministic SCC scheduling.
+.TP
+.B FIXED_TIME_FOR_TESTS
+Force deterministic timestamps, e.g. 1995-06-15T12:34:56.
 .SH AUTHOR
 C Jervis and contributors.
