@@ -443,7 +443,7 @@ sub handle_alm_list {
 sub handle_op_rcaccess {
     my ($session, $tty) = @_;
     my $mask = $state->{rcaccess}{$tty};
-    if ($mask) {
+    if (defined $mask) {
         print sprintf("RCACCESS TTY=\"%s\" ACCESS=H'%s'\n", $tty, $mask);
         result_ok($session, 'RCACCESS READ');
     } else {
