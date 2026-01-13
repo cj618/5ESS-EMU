@@ -429,6 +429,13 @@ sub grant_second_auth {
     my ($session, $other_clerk) = @_;
     return (0, 'CLERK NOT FOUND') unless exists $state->{clerks}{$other_clerk};
     return (0, 'SECOND AUTH MUST BE DIFFERENT CLERK') if $other_clerk eq $session->{clerk_id};
+    print "SECOND AUTH PASSWORD? ";
+    my $password = <STDIN> // '';
+    chomp $password;
+    if (($state->{clerks}{$other_clerk}{password_hash} // '')
+        ne password_hash($other_clerk, $password)) {
+        return (0, 'INVALID PASSWORD');
+    }
     $session->{auth_token} = {
         clerk      => $other_clerk,
         expires_at => time() + $config{auth_timeout_seconds},
