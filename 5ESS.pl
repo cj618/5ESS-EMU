@@ -102,6 +102,12 @@ sub apply_event {
     } elsif ($type eq 'rcv_commit') {
         my $channel = $event->{channel};
         my $changes = $event->{changes} || {};
+        if ((!$changes->{TERM} || !keys %{$changes}) && ref($event->{applied}) eq 'HASH') {
+            my $applied = $event->{applied};
+            $changes = { %{$changes} };
+            $changes->{TERM} //= $applied->{term} if defined $applied->{term};
+            $changes->{DN}   //= $applied->{dn} if defined $applied->{dn};
+        }
         my $term = $changes->{TERM};
         if ($term) {
             my $line = $state->{lines}{$term} || {};
