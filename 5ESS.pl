@@ -1081,7 +1081,9 @@ sub main_loop {
         my @async = $scc->tick();
         print "$_\n" for @async;
         run_pending_actions(\$prompted);
-        $ui->draw_status_line(status_text($session));
+        if ($ui->ansi_enabled() || !$prompted) {
+            $ui->draw_status_line(status_text($session));
+        }
         if (!$prompted) {
             print session_prompt($session);
             $prompted = 1;
