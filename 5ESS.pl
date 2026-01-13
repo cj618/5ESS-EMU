@@ -344,21 +344,8 @@ sub clerk_login {
         }
 
         if ($channel eq 'TEST') {
-            print "PRIVILEGE CLASS (ADMIN/TECH/OBS)? ";
-            my $role = <STDIN> // '';
-            chomp $role;
-            $role = uc($role || 'TECH');
-            $role = 'TECH' unless $role =~ /^(ADMIN|TECH|OBS)$/;
-            my $hash = password_hash($clerk_id, $password);
-            $state->{clerks}{$clerk_id} = { password_hash => $hash, role => $role };
-            Persist::append_journal({
-                type     => 'clerk_add',
-                clerk    => $clerk_id,
-                password_hash => $hash,
-                role     => $role,
-            });
-            print "RESULT: OK - NEW CLERK CREATED\n";
-            return ($clerk_id, $role);
+            print "RESULT: NG - CLERK PROVISIONING REQUIRES ADMIN OR OFFLINE TOOL\n";
+            next;
         }
 
         print "RESULT: NG - CLERK NOT AUTHORIZED\n";
