@@ -1,4 +1,10 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
+
+# Copyright (c) 2025, 2026 C Jervis under the terms outlined in LICENSE document.
+#
+# 5ESS(R) is a registered trademark of Lucent Technologies, Inc.
+
+
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)

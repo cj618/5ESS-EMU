@@ -15,12 +15,15 @@ use RCV;
 use SCC;
 
 # -----------------------------------------------------------------------------
-# 5ESS AT&T craft environment miniature emulator
+# 5ESS(R) AT&T craft environment miniature simulator
 # -----------------------------------------------------------------------------
-# Copyright (c) 2025, 2026 C R Jervis under the terms outlined in LICENSE document.
-# Based on documentation that is Copyright (c) 1984 - 1991 AT&T.
+# Copyright (c) 2025, 2026 C Jervis under the terms outlined in LICENSE document.
 #
-# 5ESS is a registered trademark of Lucent Technologies, Inc.
+#
+# Based on documentation that is Copyright (c) 1984 - 1991 AT&T.
+# and Copyright (c) 1998 - 2001 Lucent Technologies, Inc.
+#
+# 5ESS(R) is a registered trademark of Lucent Technologies, Inc.
 # -----------------------------------------------------------------------------
 
 my %config = (

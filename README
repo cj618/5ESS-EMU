@@ -1,13 +1,13 @@
 # -----------------------------------------------------------------------------
-# 5ESS AT&T craft environment miniature emulator
+# 5ESS(R) AT&T craft environment miniature simulator
 # -----------------------------------------------------------------------------
-# Copyright (c) 2025, 2026 C R Jervis under the terms outlined in LICENSE document.
+# Copyright (c) 2025, 2026 C Jervis under the terms outlined in LICENSE document.
+#
 # Based on documentation that is Copyright (c) 1984 - 1991 AT&T.
+# and Copyright (c) 1998 - 2001 Lucent Technologies, Inc.
 #
-# 5ESS is a registered trademark of Lucent Technologies, Inc.
-#
-# -----------------------------------------------------------------------------
-
+# 5ESS(R) is a registered trademark of Lucent Technologies, Inc.
+# ------
 
 OVERVIEW
 
@@ -21,15 +21,6 @@ This script is a small, interactive “craft environment” simulator that runs 
 * Lightweight persistence in ./var (dmert.journal + optional state.json)
 
 (Everything below describes the behaviour implemented in 5ESS.pl as currently uploaded.) 
-
-RECENT UPDATES
-
-* 80x24 screen helpers + status line (channel/clerk/mode/time/seq/error).
-* Contextual prompts with SEQ counters and canonical error responses.
-* Stateful alarms with ACK/CLEAR/RAISE and derived alarms.
-* RC/V ticket workflow with staged changes + commit/abort.
-* SCC batch submission + scheduler tick with async notices.
-* DMERT journal persistence in ./var (configurable).
 
 RUNNING
 
