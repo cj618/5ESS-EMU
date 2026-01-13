@@ -77,7 +77,7 @@ STARTUP FLOW
    It assigns the loaded hashes/arrays into %lines, %dns, @alarms, %rcaccess, %clerks, @batch_queue, @scc_events. 
 
 4. Channel is selected, clerk login is prompted, and a session is created
-   You pick a channel from the menu; default is RC/V Local. You then enter CLERK ID and PASSWORD. Existing clerks must match the stored password; new clerk creation is only allowed when the channel is TEST. The session object is created with channel + mode + metadata.  
+   You pick a channel from the menu; default is RC/V Local. You then enter CLERK ID and PASSWORD. Existing clerks must match the stored password; clerk provisioning is restricted to offline tooling or an admin session. The session object is created with channel + mode + metadata.  
 
 5. It prints the “Craft Shell (sim)” banner and enters the main loop 
 
