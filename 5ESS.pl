@@ -6,7 +6,7 @@ use FindBin;
 use lib "$FindBin::Bin/lib";
 use Digest::SHA qw(sha256_hex);
 use Term::ReadKey;
-use Time::HiRes qw(usleep);
+use Time::HiRes qw(time);
 
 use Persist;
 use TermUI;
@@ -59,8 +59,39 @@ sub maybe_latency {
     my ($key) = @_;
     return unless exists $config{latency_ms}{$key};
     my ($min, $max) = @{ $config{latency_ms}{$key} };
-    my $delay = $min + int(rand($max - $min + 1));
-    usleep($delay * 1000);
+    return $min + int(rand($max - $min + 1));
+}
+
+my @pending_actions;
+
+sub schedule_latency {
+    my ($key, $cb) = @_;
+    my $delay_ms = maybe_latency($key) || 0;
+    if ($delay_ms <= 0) {
+        $cb->();
+        return 0;
+    }
+    push @pending_actions, {
+        run_at => time() + ($delay_ms / 1000),
+        cb     => $cb,
+    };
+    return $delay_ms;
+}
+
+sub run_pending_actions {
+    my ($prompt_ref) = @_;
+    return unless @pending_actions;
+    my $now = time();
+    my @remaining;
+    for my $task (@pending_actions) {
+        if ($task->{run_at} <= $now) {
+            $task->{cb}->();
+            $$prompt_ref = 0;
+        } else {
+            push @remaining, $task;
+        }
+    }
+    @pending_actions = @remaining;
 }
 
 sub apply_event {
@@ -416,25 +447,27 @@ sub require_semicolon {
 }
 
 sub handle_alm_list {
-    my ($session) = @_;
-    maybe_latency('ALM_LIST');
-    my $rows = $alarms->list_active();
-    my $output = "ID   SEV ACK   RAISED              CLEARED             SOURCE   TEXT\n";
-    $output .= ("-" x 78) . "\n";
-    for my $alarm (@$rows) {
-        $output .= sprintf(
-            "%-4d %-3s %-5s %-19s %-19s %-8s %s\n",
-            $alarm->{id},
-            $alarm->{severity},
-            $alarm->{ack_state},
-            $alarm->{raised_time} || '',
-            $alarm->{cleared_time} || '--',
-            $alarm->{source} || '',
-            $alarm->{text} || '',
-        );
-    }
-    $ui->pager($output);
-    result_ok($session, 'ALARM LISTED');
+    my ($session, $after_cb) = @_;
+    schedule_latency('ALM_LIST', sub {
+        my $rows = $alarms->list_active();
+        my $output = "ID   SEV ACK   RAISED              CLEARED             SOURCE   TEXT\n";
+        $output .= ("-" x 78) . "\n";
+        for my $alarm (@$rows) {
+            $output .= sprintf(
+                "%-4d %-3s %-5s %-19s %-19s %-8s %s\n",
+                $alarm->{id},
+                $alarm->{severity},
+                $alarm->{ack_state},
+                $alarm->{raised_time} || '',
+                $alarm->{cleared_time} || '--',
+                $alarm->{source} || '',
+                $alarm->{text} || '',
+            );
+        }
+        $ui->pager($output);
+        result_ok($session, 'ALARM LISTED');
+        $after_cb->() if $after_cb;
+    });
 }
 
 sub handle_op_rcaccess {
@@ -730,23 +763,24 @@ sub handle_rcv_commit {
         return error_out($session, 'NOT AUTH');
     }
 
-    my $rcv = RCV->new($state, $session->{channel});
-    my ($ok, $msg, $ticket_id, $payload, $changes) = $rcv->commit_ticket($state->{lines}, $state->{dns});
-    if ($ok) {
-        maybe_latency('RCV_COMMIT');
-        Persist::append_journal({
-            type    => 'rcv_commit',
-            channel => $session->{channel},
-            ticket  => $ticket_id,
-            changes => $changes || {},
-            applied => $payload,
-        });
-        $scc->log_event("RCV COMMIT TKT=$ticket_id TERM=$payload->{term}");
-        consume_second_auth($session);
-        result_ok($session, "RCV COMMIT $ticket_id");
-    } else {
-        result_ng($session, $msg);
-    }
+    schedule_latency('RCV_COMMIT', sub {
+        my $rcv = RCV->new($state, $session->{channel});
+        my ($ok, $msg, $ticket_id, $payload, $changes) = $rcv->commit_ticket($state->{lines}, $state->{dns});
+        if ($ok) {
+            Persist::append_journal({
+                type    => 'rcv_commit',
+                channel => $session->{channel},
+                ticket  => $ticket_id,
+                changes => $changes || {},
+                applied => $payload,
+            });
+            $scc->log_event("RCV COMMIT TKT=$ticket_id TERM=$payload->{term}");
+            consume_second_auth($session);
+            result_ok($session, "RCV COMMIT $ticket_id");
+        } else {
+            result_ng($session, $msg);
+        }
+    });
 }
 
 sub handle_alm_ack {
@@ -795,12 +829,14 @@ sub handle_alm_raise {
 }
 
 sub handle_scc_submit {
-    my ($session, $job, $parm) = @_;
-    maybe_latency('SCC_SUBMIT');
-    my $job_entry = $scc->submit_job($job, $parm);
-    Persist::append_journal({ type => 'scc_submit', job => $job_entry });
-    $scc->log_event("SCC JOB $job_entry->{id} SUBMITTED $job");
-    result_ok($session, "JOB $job_entry->{id} QUEUED");
+    my ($session, $job, $parm, $after_cb) = @_;
+    schedule_latency('SCC_SUBMIT', sub {
+        my $job_entry = $scc->submit_job($job, $parm);
+        Persist::append_journal({ type => 'scc_submit', job => $job_entry });
+        $scc->log_event("SCC JOB $job_entry->{id} SUBMITTED $job");
+        result_ok($session, "JOB $job_entry->{id} QUEUED");
+        $after_cb->() if $after_cb;
+    });
 }
 
 sub handle_scc_stat {
@@ -991,13 +1027,11 @@ sub dispatch_rcv_menu {
 sub dispatch_scc {
     my ($session, $cmd) = @_;
     if ($cmd =~ /^ALM:LIST;?$/i) {
-        handle_alm_list($session);
-        print "$_\n" for $scc->emit_lines();
+        handle_alm_list($session, sub { print "$_\n" for $scc->emit_lines(); });
         return;
     }
     if ($cmd =~ /^SCC:SUBMIT,JOB="([^"]+)",PARM="([^"]*)";?$/i) {
-        handle_scc_submit($session, $1, $2);
-        print "$_\n" for $scc->emit_lines();
+        handle_scc_submit($session, $1, $2, sub { print "$_\n" for $scc->emit_lines(); });
         return;
     }
     if ($cmd =~ /^SCC:STAT;?$/i) {
@@ -1034,18 +1068,28 @@ sub dispatch_scc {
 
 sub main_loop {
     my ($session) = @_;
+    my $prompted = 0;
     while (1) {
         decay_unauth($state);
         my @async = $scc->tick();
         print "$_\n" for @async;
+        run_pending_actions(\$prompted);
         $ui->draw_status_line(status_text($session));
-        print session_prompt($session);
+        if (!$prompted) {
+            print session_prompt($session);
+            $prompted = 1;
+        }
 
+        my $rin = '';
+        vec($rin, fileno(STDIN), 1) = 1;
+        my $ready = select($rin, undef, undef, 0.1);
+        next unless $ready;
         my $cmd = <STDIN>;
         last unless defined $cmd;
         chomp $cmd;
         $cmd =~ s/^\s+|\s+$//g;
         $session->{seq}++;
+        $prompted = 0;
 
         if ($cmd eq '') {
             set_last_error($session, 'OK', '');
