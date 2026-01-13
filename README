@@ -40,6 +40,14 @@ Deterministic SCC scheduling (tests/dev):
 
   export 5ESS_SEED=1
 
+Config (feature flags, theming, pokes, ROP):
+
+  etc/sim.json
+
+Optional fixed timestamps for tests/dev:
+
+  export FIXED_TIME_FOR_TESTS=1995-06-15T12:34:56
+
 Resetting state:
 
   rm -rf ./var
@@ -49,6 +57,7 @@ DEV UTILITIES
 * /rclog [N]  - show last N journal entries
 * /save       - write a snapshot to var/state.json
 * /reload     - replay journal into memory
+* SHOW:ROP;   - show last 20 lines from the Records Output Printer (ROP)
 
 SMOKE TEST
 

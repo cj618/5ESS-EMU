@@ -1,19 +1,16 @@
 ************************************************************************
 *                                                                      *
-*      AT&T/LUCENT TECHNOLOGIES 5ESS® SWITCHING SYSTEM                 *
-*                                                                      *
 *      PACIFIC BELL TELEPHONE COMPANY                                  *
+*      NETWORK OPERATIONS / CENTRAL OFFICE SYSTEMS                     *
 *                                                                      *
-*      SYSTEM:   PB-5E-LA12                                            *
-*      LOCATION: TEST LOCATION                                         *
-*      GENERIC:  PL0.1                                                 *
+*  THIS IS A PRIVATE SYSTEM RESTRICTED TO AUTHORIZED USE ONLY.         *
+*  ALL ACTIVITY MAY BE MONITORED AND RECORDED.                         *
+*  UNAUTHORIZED ACCESS OR USE IS PROHIBITED AND SUBJECT TO             *
+*  DISCIPLINE AND PROSECUTION.                                         *
 *                                                                      *
-*  WARNING:                                                            *  
-*  This system is for the exclusive use of authorized personnel.       *
-*  Unauthorized access, use, or modification is prohibited and         *
-*  may be subject to criminal prosecution under applicable law.        *
-*                                                                      *
-*  ALL USAGE MAY BE MONITORED AND RECORDED.                            *
+*  OFFICE:   {{OFFICE_ID}}                                             *
+*  SWITCH:   {{SWITCH_NAME}}                                           *
+*  TTY:      {{TTY}}                                                   *
+*  DATE:     {{DATE}}  TIME: {{TIME}}                                  *
 *                                                                      *
 ************************************************************************
-

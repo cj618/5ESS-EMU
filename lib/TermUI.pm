@@ -95,4 +95,16 @@ sub draw_status_line {
     }
 }
 
+sub render_template {
+    my ($self, $path, $vars) = @_;
+    return '' unless $path && -e $path;
+    open my $fh, '<', $path or return '';
+    local $/;
+    my $text = <$fh>;
+    close $fh;
+    $vars ||= {};
+    $text =~ s/\{\{(\w+)\}\}/exists $vars->{$1} ? $vars->{$1} : ''/ge;
+    return $text;
+}
+
 1;

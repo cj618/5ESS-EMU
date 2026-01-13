@@ -1,0 +1,28 @@
+{
+  "feature_flags": {
+    "FEATURE_POKES": 1,
+    "FEATURE_ROP": 1,
+    "FEATURE_RCV_VIEWS": 0,
+    "FEATURE_RCV_BATCH": 0,
+    "FEATURE_SCC_STREAM": 1,
+    "FEATURE_REAPPLY_RC": 0
+  },
+  "theme": {
+    "brand": "Pacific Bell",
+    "office_id": "SF01",
+    "switch_name": "5ESS-SF"
+  },
+  "scc": {
+    "verbosity": "normal"
+  },
+  "pokes": {
+    "196": "RCV"
+  },
+  "rop": {
+    "file": "rop.log"
+  },
+  "rclog": {
+    "dir": "rclog"
+  },
+  "fixed_time_for_tests": ""
+}

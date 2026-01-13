@@ -6,6 +6,13 @@ use JSON::PP;
 use File::Path qw(make_path);
 
 sub now_stamp {
+    if ($ENV{'FIXED_TIME_FOR_TESTS'}) {
+        my $fixed = $ENV{'FIXED_TIME_FOR_TESTS'};
+        if ($fixed =~ /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})$/) {
+            return sprintf "%04d-%02d-%02d %02d:%02d:%02d",
+                $1, $2, $3, $4, $5, $6;
+        }
+    }
     my @t = localtime();
     return sprintf "%04d-%02d-%02d %02d:%02d:%02d",
         $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0];
