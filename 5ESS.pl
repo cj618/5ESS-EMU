@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use FindBin;
 use lib "$FindBin::Bin/lib";
+use Digest::SHA qw(sha256_hex);
 use Term::ReadKey;
 use Time::HiRes qw(usleep);
 
@@ -49,6 +50,11 @@ sub now_stamp {
     return Persist::now_stamp();
 }
 
+sub password_hash {
+    my ($clerk_id, $password) = @_;
+    return sha256_hex('5ess', $clerk_id // '', $password // '');
+}
+
 sub maybe_latency {
     my ($key) = @_;
     return unless exists $config{latency_ms}{$key};
@@ -63,9 +69,11 @@ sub apply_event {
     if ($type eq 'rcaccess_set') {
         $state->{rcaccess}{ $event->{tty} } = $event->{mask};
     } elsif ($type eq 'clerk_add') {
+        my $hash = $event->{password_hash}
+            // password_hash($event->{clerk}, $event->{password});
         $state->{clerks}{ $event->{clerk} } = {
-            password => $event->{password},
-            role     => $event->{role},
+            password_hash => $hash,
+            role          => $event->{role},
         };
     } elsif ($type eq 'alarm_raise') {
         push @{ $state->{alarms} }, $event->{alarm};
@@ -142,12 +150,6 @@ if (!@{ $state->{alarms} }) {
     my $alarms = Alarms->new($state);
     $alarms->raise_alarm(severity => 'MN', source => 'SM02', text => 'HIGH-BIT-ERROR-RATE');
     $alarms->raise_alarm(severity => 'MJ', source => 'PWR', text => 'BATTERY DISCHARGE 53.1 V -> 50.9 V');
-}
-
-for my $clerk (keys %{ $state->{clerks} }) {
-    my $val = $state->{clerks}{$clerk};
-    next if ref $val eq 'HASH';
-    $state->{clerks}{$clerk} = { password => $val, role => 'TECH' };
 }
 
 my $alarms = Alarms->new($state);
@@ -333,7 +335,8 @@ sub clerk_login {
         chomp $password;
 
         if (exists $state->{clerks}{$clerk_id}) {
-            if ($state->{clerks}{$clerk_id}{password} eq $password) {
+            if (($state->{clerks}{$clerk_id}{password_hash} // '')
+                eq password_hash($clerk_id, $password)) {
                 return ($clerk_id, $state->{clerks}{$clerk_id}{role});
             }
             print "RESULT: NG - INVALID PASSWORD\n";
@@ -346,11 +349,12 @@ sub clerk_login {
             chomp $role;
             $role = uc($role || 'TECH');
             $role = 'TECH' unless $role =~ /^(ADMIN|TECH|OBS)$/;
-            $state->{clerks}{$clerk_id} = { password => $password, role => $role };
+            my $hash = password_hash($clerk_id, $password);
+            $state->{clerks}{$clerk_id} = { password_hash => $hash, role => $role };
             Persist::append_journal({
                 type     => 'clerk_add',
                 clerk    => $clerk_id,
-                password => $password,
+                password_hash => $hash,
                 role     => $role,
             });
             print "RESULT: OK - NEW CLERK CREATED\n";
