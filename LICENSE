@@ -2,11 +2,15 @@ SOFTWARE LICENSE
 
 Copyright (c) 2025, 2026 C Jervis - chrisxjervis@gmail.com
 
-Based on documentation that are Copyright (c) 1984 - 1991 AT&T.
-and Copyright (c) 1998 - 2001 Lucent Technologies, Inc.
+Portions of the technical concepts, terminology, and historical descriptions
+referenced in this project are derived from publicly available and archival
+materials relating to the AT&T 5ESS(R) switch.
 
-5ESS(R) is a registered trademark of Lucent Technologies, Inc.
+Original technology and documentation Copyright (C) AT&T Bell Laboratories, AT&T Corp.,
+and Lucent Technologies Inc. Successor-in-interest rights held by Nokia Corporation.
 
+This project is an independent, unofficial work and is not affiliated with,
+endorsed by, or sponsored by AT&T, Lucent, Alcatel-Lucent, or Nokia Corporation
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:

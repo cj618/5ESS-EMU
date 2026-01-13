@@ -1,0 +1,381 @@
+Got it. Below is a **research-backed target spec** for what a **1990s/early-2000s 5ESS maintenance/craft terminal experience** looked like, and then a **super-detailed Codex work order** to upgrade your simulator to match it.
+
+Where I’m leaning on *official* material, it’s mostly from Lucent/Nokia documentation (e.g., 235-700-200 “UNIX RTR Operating System Reference Manual” glossary/defs). Where I’m leaning on *field lore*, I’m explicit about it (e.g., Phrack-era descriptions of RC/V menus and “pokes”). Use the official bits for the “what”, and the lore for the “feel.” ([ia601200.us.archive.org][1])
+
+---
+
+## What a 5ESS maintenance terminal “was” in practice
+
+### Physical workstation vibe (MCC / craft position)
+
+A typical craft/maintenance position in a 5ESS office was effectively a **workbench** consisting of:
+
+* **A video display terminal + keyboard** (text mode, fixed-width, lots of blocky forms/screens)
+* **A ROP (Records Output Printer)** printing key events, confirmations, alarms, and audit trails
+* **A key telephone set** at the workstation (for craft coordination / test desk / calling)
+  This “craft interface” bundle is described as the **MCC (Master Control Center)**, and the **TLWS** being part of MCC tooling/ecosystem as well. ([ia601200.us.archive.org][1])
+
+Your sim should feel like “you’re sitting at that desk”: one screen, one printer stream, one “handset” concept (even if stubbed).
+
+### Interaction model: channels, not “a shell”
+
+5ESS operations are **channel-oriented**. You “get on” a channel and that channel has a personality:
+
+* **RC/V channel**: provisioning / translations via menu-driven Recent Change/Verify
+* **SCC / monitoring channel**: high-volume logging and alarm surveillance (think: “watch the switch”)
+* **MCC/TLWS/STLWS terminals**: craft access points with different capabilities/roles
+* **MTTY**: “maintenance teletypewriter” concept (older style, but the mentality persists) ([ia601200.us.archive.org][1])
+
+In older descriptions, operators access the RC/V menu system via a **“poke”** (a numeric trigger) from a command prompt; one cited example is **poke 196** starting RC/V and printing start/completed messages on the ROP. ([Phrack][2])
+
+### Screen language: MML + menu/forms (“views”)
+
+The 5ESS uses a **Man-Machine Language (MML)** style and menu/forms called **views**:
+
+* A screen header often identifies **switch name / office name** (e.g., “5ESS SWITCH WCDS0”) and **view identifiers** like “RECENT CHANGE 28.1” (Global RC Scheduling) ([Phrack][2])
+* Navigation commands are terse: `H`, `Q`, `R`, `V`, `<`, `>`, numeric view selection patterns like `#.#` ([Phrack][2])
+* Batch modes exist for provisioning bursts: **BMI/BMD/BMR/IM** (Delayed activation input/status/release vs immediate). ([Phrack][2])
+
+### Security/permissions feel: terminals + clerk IDs + audit
+
+5ESS permissions are shaped by **(a) the terminal identity** and **(b) the clerk ID**, with a concept of **RC security** controlling what can be changed. One description notes an RC security function that can deny RC changes, while “verify” is always allowed; and that RC permission data can be set via input messages like `SET:RCACCESS...` and checked via `OP:RCACCESS...`. ([Phrack][2])
+
+Even if you do this as an emulator-only construct, it’s crucial for realism: the operator experience is “I’m on the wrong terminal / wrong permission class / ask SCC to open the gate.”
+
+### Persistence & change history vibe
+
+A very “5ESS-ish” idea is that recent changes are logged and can be stored/handled as files (e.g., references to `/rclog` for batch operations/history reporting are common in period descriptions). ([Phrack][2])
+Also, official docs around LTG (Large Terminal Growth) talk about reapplying RCs at scale and even reference a throughput rate for RC reapplication (hundreds per hour), which implies RC is a *first-class pipeline* in operations. ([documentation.nokia.com][3])
+
+---
+
+# Codex Work Order: “Make the simulator feel like a Pacific Bell 5ESS craft terminal”
+
+**Theme:** Pacific Bell branding in banners, switch/office naming, printer headings; otherwise treat the system as AT&T/Lucent era.
+**Goal:** When a telco person looks at the sim, they go: “Yep. That’s the vibe.”
+
+## 0) High-level deliverables (non-negotiable)
+
+1. **Terminal UI**: one interactive TTY per session with:
+
+   * main command prompt (`CMD<` style)
+   * ability to “poke” into subsystems (notably RC/V)
+   * session-scoped identity and permissions
+2. **RC/V menu system emulator**:
+
+   * menu pages, help pages, view navigation, read/insert/update/delete modes
+   * batch modes BMI/BMD/BMR/IM
+3. **ROP printer stream**:
+
+   * separate output stream that logs: poke start/completed, RC commits, alarms, audit
+4. **Persistence layer**:
+
+   * `/rclog`-like directory semantics for change batches + change history
+   * “state reload” on restart
+5. **Pacific Bell skin**:
+
+   * login banner, switch name defaults, ROP headers, office code, timestamp formats
+
+Acceptance is based on **behavioral realism**, not just code coverage.
+
+---
+
+## 1) UI/Terminal realism: prompts, headers, and “desk feel”
+
+### 1.1 Add terminal archetypes
+
+Implement terminal types with different defaults/capabilities:
+
+* `MCC` (Master Control Center): can poke into RC/V; has ROP attached; can query RC access
+* `SCC` (Switching Control Center): alarm/log stream heavy; can query, cannot do RC changes by default
+* `RC` channel: direct entry into RC/V environment (or craft shell → RC/V)
+* `TLWS` / `STLWS`: treated as craft terminals in MCC ecosystem (can access RC/V via poke) ([ia601200.us.archive.org][1])
+
+**Implementation details**
+
+* Session object includes: `terminal_type`, `terminal_name` (symbolic TTY name), `office_id`, `switch_name`, `clerk_id`, `permission_mask`
+* Render these into screen headers and ROP records.
+
+### 1.2 Prompt grammar
+
+* Base prompt on craft shell style: `CMD<` for MCC/TLWS command mode. ([Phrack][2])
+* RC/V prompt is menu-driven (“Enter …” prompts and view screens).
+
+### 1.3 Timestamp + heading formatting
+
+Use a consistent timestamp style for:
+
+* screen headers (view screens)
+* ROP records (audit/confirmations)
+
+Target: *period-correct, plain English day/month, 24h or 12h depending on your existing aesthetic, but keep it consistent.*
+
+---
+
+## 2) “Pokes” as the gateway mechanism (core realism)
+
+### 2.1 Implement numeric poke dispatcher
+
+From `CMD<`, numeric input should be treated as a poke if:
+
+* it’s all digits and matches a configured poke table
+
+**Minimum pokes**
+
+* `196` → enter RC/V Menu System
+
+  * On entry: print `RC/V 196 STARTING` to ROP
+  * On successful init: print `RC/V 196 COMPLETED` to ROP ([Phrack][2])
+
+Add a config file: `etc/pokes.json` so you can add more later.
+
+### 2.2 Failure modes
+
+* If user lacks permission to run a poke, deny with an operator-feeling message (“DENIED BY RC SECURITY FUNCTION” vibe), and log denial on ROP.
+
+---
+
+## 3) RC/V Menu System (the heart of it)
+
+### 3.1 Navigation model
+
+Implement:
+
+* “menu pages” and “view pages”
+* `H`, `H#`, `Q`, `R`, `V`, `<`, `>` navigation
+* numeric selection:
+
+  * from class menu: `#` to go to view menu page
+  * from view menu: `#` to go to view
+  * `#.#` direct view addressing ([Phrack][2])
+
+**Important realism detail:** menu systems can be “lame” or imperfect—allow dead-ends and oddities as “known quirks” behind a feature flag (for authenticity). ([Phrack][2])
+
+### 3.2 Modes: RECENT CHANGE vs VERIFY
+
+Implement two modes:
+
+* `VERIFY` always allowed
+* `RECENT CHANGE` subject to RC security mask and clerk privileges ([Phrack][2])
+
+### 3.3 Views and operations
+
+Implement view operations:
+
+* `R` review
+* `I` insert
+* `U` update
+* `D` delete (and `DV` delete with verify)
+* read variants like `#R`, `#I`, `#U`, etc. ([Phrack][2])
+
+You do **not** need to model real telco provisioning data structures yet—start with a small set of plausible objects (lines, features, trunks) but make the *workflow* feel right.
+
+### 3.4 Batch modes: BMI / BMD / BMR / IM
+
+Implement:
+
+* `BMI`: Batch Mode Input
+
+  * choose `DEMAND` or `TIMEREL`
+  * store batch file in `/rclog/<clerk_id>/<timestamp>.rc`
+* `BMD`: display status / delayed release report (summary + by order + by clerk)
+
+  * include the pseudo menu options like “1 Summary of clerk activity…” ([Phrack][2])
+* `BMR`: release a stored batch (apply to DB)
+* `IM`: immediate release mode (apply as entered) ([Phrack][2])
+
+**ROP behavior**
+
+* Every release (BMR/IM) prints a “transaction record” line to ROP including:
+
+  * clerk id
+  * terminal name
+  * service order number (can be generated if not provided)
+  * success/failure status
+* Errors must be visible on screen *and* printer.
+
+### 3.5 Global RC Scheduling “View 28.1” stub
+
+Create at least one “canonical” view that matches the vibe:
+
+* “GLOBAL RECENT CHANGE SCHEDULING” with view id `28.1` ([Phrack][2])
+  Even if fields are stubbed, support:
+* viewing/editing clerk/password entries in simulator-only form (do not mimic real credential handling—keep it internal and safe)
+* audit all changes on ROP.
+
+---
+
+## 4) RC Security Model (terminal permissions + clerk privileges)
+
+### 4.1 Terminal symbolic names + permission masks
+
+Implement a lightweight RC security model:
+
+* `terminal_name` (e.g., `"mcc1"`, `"rmas1"`, `"scc1"`)
+* `permission_mask` (bitmask or hex string)
+* `VERIFY` always allowed
+* `RECENT CHANGE` allowed only if mask permits that “functional area” (in the sim, define a few areas: LINES, FEATURES, ROUTING, TRUNKS)
+
+This mirrors period descriptions of RC security being terminal-based and stored outside ODD in OS files, even if your internal implementation differs. ([Phrack][2])
+
+### 4.2 Operator commands (sim-only)
+
+Add simulator-safe commands (names can be yours, but output should feel MML-ish):
+
+* `OP:RCACCESS,TTY="xxxxx";` → display terminal’s current RC access mask ([Phrack][2])
+* `SET:RCACCESS,TTY="aaaaa",ACCESS=H'bbbbb;` → in-sim admin can set mask ([Phrack][2])
+
+Log all `SET:` operations to ROP.
+
+---
+
+## 5) ROP Printer Stream (separate “paper” channel)
+
+### 5.1 Implement ROP as its own output device
+
+ROP should:
+
+* receive **structured records** (timestamp, subsystem, severity, message)
+* be accessible via:
+
+  * live tail window in UI (split view) OR
+  * a separate “printer” command (`SHOW:ROP;`) OR
+  * writing to `var/rop.log` and letting the UI “open printer tray”
+
+### 5.2 What must print
+
+Minimum:
+
+* poke start/completed lines
+* RC batch releases and results
+* security denials
+* alarms from SCC stream (see below)
+
+The ROP is how operators “trust the switch.”
+
+---
+
+## 6) SCC/Alarm stream (make it noisy, but legible)
+
+Add a simulated SCC channel which:
+
+* outputs periodic “management information messages” / alarms / summaries
+* can be tuned (quiet/normal/busy office)
+* prints only major events to ROP (e.g., MAJOR/MINOR severity)
+
+This maps to the notion that SCC is for logging/monitoring rather than provisioning. ([Phrack][2])
+
+---
+
+## 7) Persistence: `/rclog`, state reload, and office-dependent data feel
+
+### 7.1 `/rclog` directory semantics
+
+Create a real directory in the repo runtime data:
+
+* `var/rclog/`
+* store:
+
+  * batch files
+  * RC history reports
+  * “pending” vs “complete” status indices
+
+This lines up with common descriptions of RC batch/history being stored/produced via `/rclog`. ([Phrack][2])
+
+### 7.2 RC reapplication concept (LTG-inspired realism)
+
+Without implementing full LTG, add a concept of:
+
+* “reapply pending RCs” job that can run on startup or on operator command
+* throttle and progress output
+* optionally mention a nominal processing rate (as flavor text) inspired by LTG documentation describing RC reapplication throughput. ([documentation.nokia.com][3])
+
+---
+
+## 8) Pacific Bell theming (skin + content)
+
+### 8.1 Login banner + MOTD
+
+Implement a banner that evokes:
+
+* Pacific Bell central office operations
+* acceptable/legal warning
+* office code + switch name line
+* e.g., “PACIFIC BELL – NETWORK OPERATIONS – AUTHORIZED USE ONLY”
+
+### 8.2 Office/switch naming defaults
+
+Set defaults such as:
+
+* `switch_name`: `5ESS SWITCH`
+* `office_id`: something plausible for PacBell (you can invent a code, or let config pick one)
+* if you want to echo the vibe of a named office like `WCDS0`, keep it configurable and not hard-coded. (A period example shows `5ESS SWITCH WCDS0` in RC/V screens.) ([Phrack][2])
+
+### 8.3 ROP headers
+
+ROP lines should include a header prefix like:
+
+* `PACBELL <office> ROP:` (or similar)
+* plus timestamps and severity tags
+
+---
+
+## 9) Bugs to iron out (realism-driven)
+
+Codex should specifically hunt and fix:
+
+* session bleed (one channel affecting another incorrectly)
+* non-deterministic ordering of RC commits vs ROP prints (printer should reflect commit order)
+* partial writes to `/rclog` (must be atomic)
+* RC/V navigation edge cases: `<` / `>` / numeric addressing should never crash; at worst, “INVALID COMMAND” with help hint
+* “quit” paths should always return operator to `CMD<` cleanly
+
+Add regression tests that simulate:
+
+* poke 196 → enter RC/V → do an IM change → verify → quit → confirm ROP lines exist
+* BMI TIMEREL batch created → BMD shows pending → BMR applies → BMD shows complete
+
+---
+
+## 10) Codex implementation guidance (how to work)
+
+Tell Codex to:
+
+* Start by writing a **design note** in `docs/terminal-realism.md` describing:
+
+  * terminals/channels
+  * RC/V menu navigation grammar
+  * ROP message schema
+  * persistence layout
+* Implement incrementally behind feature flags:
+
+  * `FEATURE_RCV_MENU=1`
+  * `FEATURE_ROP=1`
+  * `FEATURE_SCC_STREAM=1`
+* Prefer **text fixtures** for screens:
+
+  * store view templates in `assets/views/` so you can iterate the UI without touching logic
+* Add a “golden transcript” test harness:
+
+  * feed input keystrokes
+  * compare screen and ROP outputs to expected transcripts
+
+---
+
+## “Done” looks like this (operator story)
+
+1. I connect to an MCC terminal, see a Pacific Bell banner.
+2. At `CMD<` I type `196`.
+3. ROP prints `RC/V 196 STARTING` and `COMPLETED`.
+4. I navigate help pages, flip to VERIFY, inspect a view.
+5. I use IM or BMI to apply a change; ROP prints an audit line.
+6. I quit back to `CMD<`.
+7. SCC channel is noisy and believable; major alarms also hit the ROP.
+
+That’s the maintenance terminal vibe: **ritual, audit, and controlled power.**
+
+
+
+[1]: https://ia601200.us.archive.org/view_archive.php?archive=%2F12%2Fitems%2F5ess-switch-dk5e-cd-1999-05%2F5ESS-DK5E.zip&file=5EDOCS%2F93447.PDF "UNIX RTR Operating System Reference Manual"
+[2]: https://phrack.org/issues/43/16 ".:: Phrack Magazine ::."
+[3]: https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/235106306.UPDT_V1_5ESS%20Switch%205E16.2%20Large%20Terminal%20Growth%20Procedures.pdf "5ESS® Switch 5E16.2 Large Terminal Growth Procedures 5E16.2 Software Release"

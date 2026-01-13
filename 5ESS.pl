@@ -19,11 +19,9 @@ use SCC;
 # -----------------------------------------------------------------------------
 # Copyright (c) 2025, 2026 C Jervis under the terms outlined in LICENSE document.
 #
+# Based on original technology and documentation Copyright (C) AT&T and 
+# Lucent Technologies Inc. Successor-in-interest rights held by Nokia Corporation.
 #
-# Based on documentation that is Copyright (c) 1984 - 1991 AT&T.
-# and Copyright (c) 1998 - 2001 Lucent Technologies, Inc.
-#
-# 5ESS(R) is a registered trademark of Lucent Technologies, Inc.
 # -----------------------------------------------------------------------------
 
 my %config = (
