@@ -1,0 +1,76 @@
+Hacking on 5ESS-EMU
+===================
+
+5ESS-EMU should be developed like a small old-school Perl project: simple
+files, plain code, careful changes and useful tests.
+
+Working rules
+-------------
+
+* Do not work directly on `main`.
+* Make one coherent change at a time.
+* Prefer small commits with direct messages.
+* Keep the terminal craft-shell feel.
+* Do not introduce a modern web framework.
+* Do not commit generated state under `var/`.
+* Add or update tests for behavioural changes.
+* Keep third-party historical material separate from original source code.
+
+Suggested branch names
+----------------------
+
+    work/add-test-suite
+    work/refactor-persist
+    work/cgi-console
+    work/rcv-validation
+    work/docs-install
+
+Commit message style
+--------------------
+
+Use plain, descriptive commit messages:
+
+    Add regression tests for RC/V tickets
+
+    Cover ticket open, staged changes, validation failure and successful
+    commit.  Use a temporary state directory so tests do not touch the
+    developer's working var tree.
+
+Avoid corporate or tool-flavoured commit messages.  The project should read as
+a sincere maintainer's work, not as generated marketing copy.
+
+Testing
+-------
+
+Before committing, run:
+
+    perl -c 5ESS.pl
+    perl -Ilib -c lib/*.pm
+    prove -Ilib t
+
+If a test would be too awkward for a particular change, mention that in the
+commit message or in the relevant documentation.
+
+Refactoring
+-----------
+
+Refactor gradually.  The current main script should shrink over time, but only
+behind tests.  Move behaviour into modules without changing command output
+unless the command output is deliberately being corrected.
+
+Good future module targets include:
+
+    lib/FiveESS/Config.pm
+    lib/FiveESS/State.pm
+    lib/FiveESS/Command.pm
+    lib/FiveESS/Session.pm
+    lib/FiveESS/Craft.pm
+    lib/FiveESS/CGI.pm
+
+Historical material
+-------------------
+
+Research is encouraged, but cite it in project notes.  Do not copy long manual
+passages into the source tree.  Convert research into simulator behaviour,
+implementation notes, command references and clearly marked fictional demo
+data.
