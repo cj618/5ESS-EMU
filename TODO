@@ -1,0 +1,40 @@
+5ESS-EMU TODO
+=============
+
+Short term
+----------
+
+* Keep the test suite passing under `prove -Ilib t`.
+* Add a bootstrap/offline clerk provisioning tool.
+* Move configuration loading out of `5ESS.pl`.
+* Move command parsing into a testable module.
+* Document the current command set.
+* Add example terminal transcripts.
+* Add a deterministic demo office profile.
+
+Medium term
+-----------
+
+* Expand MCC page coverage.
+* Add a richer alarm catalogue.
+* Add trunk-group and line-equipment displays.
+* Add better RC/V validation and guided workflows.
+* Add ROP categories and operator event records.
+* Add journal integrity checks and compaction.
+* Add a simple CGI craft-console interface.
+
+Long term
+---------
+
+* Create a releasable tarball target.
+* Add a man page.
+* Add a polished Pacific Bell demo profile.
+* Add period-styled operator documentation.
+* Tag a first release once tests, docs and demo mode are coherent.
+
+Research
+--------
+
+* Build a research index for 5ESS documents and telecom history sources.
+* Separate official documentation, secondary reporting, lore and atmosphere.
+* Turn source research into implementation notes, not copied manual text.
