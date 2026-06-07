@@ -1,2 +1,22 @@
 .DS_Store
 var/
+
+# local switch state
+*.journal
+*.log
+*.tmp
+*.bak
+*.old
+
+# Perl build/test by-products
+blib/
+pm_to_blib
+Makefile
+Makefile.old
+MYMETA.*
+cover_db/
+nytprof.out
+
+# editor noise
+*~
+.#*
