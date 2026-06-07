@@ -1,0 +1,68 @@
+5ESS-EMU
+========
+
+5ESS-EMU is a small Perl simulator inspired by the AT&T/Lucent 5ESS craft
+environment, with a Pacific Bell-flavoured default office.  It is intended as
+an educational and historical toy: a craft-shell style program with simulated
+recent-change/verify work, alarms, SCC jobs, ROP output and switch state.
+
+It is not a real switch administration tool.  It does not administer real
+telecommunications equipment and is not affiliated with AT&T, Lucent, Nokia,
+Pacific Bell or any successor entity.
+
+Current state
+-------------
+
+The tree currently contains a terminal craft shell in `5ESS.pl`, supporting
+modules under `lib/`, sample configuration under `etc/`, and historical
+reference material under `raw docs/`.
+
+The immediate development goal is to stabilise the existing terminal simulator
+before adding a CGI craft-console interface.
+
+Running
+-------
+
+Check syntax first:
+
+    perl -c 5ESS.pl
+    perl -Ilib -c lib/*.pm
+
+Run the terminal simulator:
+
+    perl 5ESS.pl
+
+By default state is written under `./var`.  To keep separate state trees, set
+`5ESS_STATE_DIR`:
+
+    5ESS_STATE_DIR=/tmp/5ess-demo perl 5ESS.pl
+
+Tests
+-----
+
+Run the test suite with:
+
+    prove -Ilib t
+
+or, after generating a Makefile:
+
+    perl Makefile.PL
+    make test
+
+The tests use temporary state directories and should not touch a developer's
+local `var/` tree.
+
+Source material
+---------------
+
+Original project source code is BSD 2-Clause licensed.  Historical manuals and
+other third-party reference materials are used only as research sources.  They
+are not covered by the project's BSD licence unless expressly stated by their
+respective rights holders.
+
+Style
+-----
+
+The intended style is a late-1990s or early-2000s Perl/Unix open-source
+project: plain files, plain Perl, terse operator output, fixed-width terminal
+screens and practical documentation.  New code should preserve that feel.
