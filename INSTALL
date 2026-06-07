@@ -1,0 +1,64 @@
+Installing 5ESS-EMU
+===================
+
+Requirements
+------------
+
+5ESS-EMU is written for Perl 5.
+
+The current code uses ordinary Perl modules:
+
+    strict
+    warnings
+    FindBin
+    Digest::SHA
+    JSON::PP
+    Term::ReadKey
+    Time::HiRes
+    File::Path
+    File::Temp      (tests)
+    Test::More      (tests)
+
+`Term::ReadKey` may need to be installed separately on some systems.
+
+Basic check
+-----------
+
+From the repository root:
+
+    perl -c 5ESS.pl
+    perl -Ilib -c lib/*.pm
+
+Run tests
+---------
+
+    prove -Ilib t
+
+or:
+
+    perl Makefile.PL
+    make test
+
+State directory
+---------------
+
+The simulator writes local state under `./var` unless told otherwise.
+
+For ordinary use:
+
+    perl 5ESS.pl
+
+For a disposable state tree:
+
+    mkdir -p /tmp/5ess-state
+    5ESS_STATE_DIR=/tmp/5ess-state perl 5ESS.pl
+
+Do not commit generated state, journals or logs.
+
+CGI notes
+---------
+
+The CGI interface is planned but should not be treated as complete until the
+terminal core has tests and reusable command/state modules. When added, the
+CGI interface should run under a conventional CGI-capable web server and use an
+explicit writable state directory.
