@@ -1,0 +1,20 @@
+# local switch state
+var/
+*.journal
+*.log
+*.tmp
+*.bak
+*.old
+
+# Perl build/test by-products
+blib/
+pm_to_blib
+Makefile.old
+MYMETA.*
+cover_db/
+nytprof.out
+
+# editor and OS noise
+*~
+.#*
+.DS_Store
