@@ -1,0 +1,11 @@
+Revision history for 5ESS-EMU
+=============================
+
+Unreleased
+----------
+
+* Added basic repository hygiene files.
+* Added initial project, installation and maintainer documentation.
+* Added an initial automated test harness for core modules.
+* Added research and Pacific Bell theme planning notes.
+
